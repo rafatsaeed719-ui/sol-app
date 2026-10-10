@@ -41,20 +41,29 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Build APK
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk SOL.apk
+
+      - name: Build small APK (arm64)
+        run: flutter build apk --release --target-platform android-arm64
 
       - name: Rename APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk SOL.apk
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk SOL-arm64.apk
+          ls -la *.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: SOL-apk
-          path: SOL.apk
+          path: '*.apk'
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: SOL ${{ github.run_number }}
-          files: SOL.apk
+          files: |
+            SOL.apk
+            SOL-arm64.apk
           make_latest: true
