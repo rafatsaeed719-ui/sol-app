@@ -41,13 +41,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> login() async {
     if (email.text.trim().isEmpty || pass.text.isEmpty) {
-      toast(context, 'اكتب الإيميل والباسورد', error: true);
+      toast(context, 'اكتب اسم المستخدم (أو الإيميل) والباسورد', error: true);
       return;
     }
     setState(() => busy = true);
     try {
       await auth.signInWithEmailAndPassword(
-          email: email.text.trim(), password: pass.text);
+          email: loginToEmail(email.text), password: pass.text);
     } catch (e) {
       if (mounted) toast(context, authError(e), error: true);
     }
@@ -57,6 +57,10 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> forgot() async {
     if (email.text.trim().isEmpty) {
       toast(context, 'اكتب إيميلك الأول', error: true);
+      return;
+    }
+    if (!email.text.contains('@')) {
+      toast(context, 'لو نسيت كلمة السر كلّم إدارة SOL وهيبعتولك واحدة جديدة');
       return;
     }
     try {
@@ -88,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.emailAddress,
                 textDirection: TextDirection.ltr,
                 decoration: const InputDecoration(
-                    labelText: 'الإيميل', prefixIcon: Icon(Icons.email_outlined)),
+                    labelText: 'اسم المستخدم أو الإيميل', prefixIcon: Icon(Icons.person_outline)),
               ),
               const SizedBox(height: 12),
               TextField(

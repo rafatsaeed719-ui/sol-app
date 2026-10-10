@@ -72,8 +72,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => busy = true);
     try {
       if (needAccount) {
+        if (!email.text.contains('@') && !validUsername(email.text)) {
+          throw 'اسم المستخدم بالإنجليزي أو أرقام من غير مسافات (3 حروف على الأقل)';
+        }
         await auth.createUserWithEmailAndPassword(
-            email: email.text.trim(), password: pass.text);
+            email: loginToEmail(email.text), password: pass.text);
       }
       if (!isAdmin) {
         final data = <String, dynamic>{
@@ -85,6 +88,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'lat': location!.latitude,
           'lng': location!.longitude,
           'email': auth.currentUser?.email ?? '',
+          if (needAccount && !email.text.contains('@'))
+            'username': email.text.trim().toLowerCase(),
         };
         final ref = db.collection('users').doc(uid);
         if (editMode) {
@@ -177,7 +182,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ],
         if (needAccount) ...[
-          _f(email, 'الإيميل *', Icons.email_outlined,
+          _f(email, 'الإيميل أو اسم مستخدم *', Icons.email_outlined,
               type: TextInputType.emailAddress, ltr: true),
           _f(pass, 'الباسورد * (6 على الأقل)', Icons.lock_outline,
               obscure: true, ltr: true),

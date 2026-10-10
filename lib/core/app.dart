@@ -11,6 +11,20 @@ import 'package:intl/intl.dart' as intl;
 const String kAdminEmail = 'rafatsaeed719@gmail.com';
 const String kBrand = 'SOL';
 
+/// الحسابات اللي المدير بيعملها باسم مستخدم بتتسجل داخلياً كـ username@sol-store.app
+const String kUserDomain = 'sol-store.app';
+
+String usernameToEmail(String username) =>
+    '${username.trim().toLowerCase()}@$kUserDomain';
+
+/// اللي اتكتب في خانة الدخول: لو فيه @ يبقى إيميل، غير كده يبقى اسم مستخدم
+String loginToEmail(String input) {
+  final t = input.trim();
+  return t.contains('@') ? t : usernameToEmail(t);
+}
+
+bool validUsername(String u) => RegExp(r'^[a-zA-Z0-9._-]{3,30}$').hasMatch(u.trim());
+
 const Color kPrimary = Color(0xFF141414); // أسود البراند
 const Color kAccent = Color(0xFFC9A54C); // دهبي البراند
 const Color kDanger = Color(0xFFC0392B);

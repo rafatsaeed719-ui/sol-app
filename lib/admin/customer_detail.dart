@@ -7,6 +7,7 @@ import '../core/data.dart';
 import '../customer/my_orders_screen.dart';
 import '../shared/chat_screen.dart';
 import '../shared/invoice_view.dart';
+import 'customer_accounts.dart';
 import 'dashboard_screen.dart';
 import 'invoice_form.dart';
 
@@ -126,7 +127,8 @@ class _Profile extends StatelessWidget {
           ListTile(
               leading: const Icon(Icons.phone),
               title: Text(phone, textDirection: TextDirection.ltr)),
-          ListTile(leading: const Icon(Icons.email), title: Text(m['email'] ?? '')),
+          if (m['createdByAdmin'] != true)
+            ListTile(leading: const Icon(Icons.email), title: Text(m['email'] ?? '')),
           if ((m['address'] ?? '').toString().isNotEmpty)
             ListTile(leading: const Icon(Icons.home), title: Text(m['address'])),
           ListTile(
@@ -140,6 +142,7 @@ class _Profile extends StatelessWidget {
               title: Text('مسجّل من ${fmtDate(m['createdAt'])}')),
         ]),
       ),
+      CredentialsCard(customerId: customerId, m: m),
       StreamBuilder(
         stream: db.collection('invoices').where('customerId', isEqualTo: customerId).snapshots(),
         builder: (context, s) {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app.dart';
 import '../core/data.dart';
+import 'customer_accounts.dart';
 import 'customer_detail.dart';
 
 class CustomersAdmin extends StatefulWidget {
@@ -17,6 +18,20 @@ class _CustomersAdminState extends State<CustomersAdmin> {
 
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'addCustomer',
+        onPressed: () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const AddCustomerScreen())),
+        icon: const Icon(Icons.person_add),
+        label: const Text('إضافة عميل'),
+      ),
+      body: _list(context),
+    );
+  }
+
+  Widget _list(BuildContext context) {
     return StreamBuilder(
       stream: db.collection('users').snapshots(),
       builder: (context, us) {
@@ -88,7 +103,7 @@ class _CustomersAdminState extends State<CustomersAdmin> {
                     ? const EmptyView('مفيش عملاء لسه — أول ما محل يسجّل هيظهر هنا',
                         icon: Icons.storefront)
                     : ListView.builder(
-                        padding: const EdgeInsets.only(bottom: 20),
+                        padding: const EdgeInsets.only(bottom: 90),
                         itemCount: list.length,
                         itemBuilder: (c, i) {
                           final m = list[i].data();

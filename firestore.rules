@@ -15,7 +15,7 @@ service cloud.firestore {
       allow create: if isAdmin() || (isMe(userId) && request.resource.data.points == 0);
       // العميل يعدّل بياناته بس من غير ما يلمس النقاط
       allow update: if isAdmin() || (isMe(userId) &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['points']));
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['points', 'username', 'password', 'createdByAdmin']));
       allow delete: if isAdmin();
     }
 
