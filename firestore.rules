@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn() && request.auth.token.email == 'rafatsaeed719@gmail.com';
+    }
+    function isMe(id) { return signedIn() && request.auth.uid == id; }
+    function ownsDoc() { return isMe(resource.data.customerId); }
+
+    // بيانات المحلات
+    match /users/{userId} {
+      allow read: if isMe(userId) || isAdmin();
+      allow create: if isAdmin() || (isMe(userId) && request.resource.data.points == 0);
+      // العميل يعدّل بياناته بس من غير ما يلمس النقاط
+      allow update: if isAdmin() || (isMe(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['points']));
+      allow delete: if isAdmin();
+    }
+
+    // الأصناف والعروض والإعدادات: الكل يقرأ والمدير بس يكتب
+    match /products/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+    match /offers/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+    match /settings/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // الطلبات
+    match /orders/{id} {
+      allow read: if isAdmin() || ownsDoc();
+      allow create: if isMe(request.resource.data.customerId) &&
+        request.resource.data.status == 'new';
+      // العميل يقدر يلغي طلبه وهو لسه جديد بس
+      allow update: if isAdmin() || (ownsDoc() && resource.data.status == 'new' &&
+        request.resource.data.status == 'cancelled' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
+      allow delete: if isAdmin();
+    }
+
+    // الفواتير والتحصيل والمرتجعات: المدير بس يكتب، العميل يقرأ بتاعه
+    match /invoices/{id} {
+      allow read: if isAdmin() || ownsDoc();
+      allow write: if isAdmin();
+    }
+    match /payments/{id} {
+      allow read: if isAdmin() || ownsDoc();
+      allow write: if isAdmin();
+    }
+    match /returns/{id} {
+      allow read: if isAdmin() || ownsDoc();
+      allow write: if isAdmin();
+    }
+
+    // الشات
+    match /chats/{customerId} {
+      allow read, write: if isAdmin() || isMe(customerId);
+      match /messages/{msg} {
+        allow read: if isAdmin() || isMe(customerId);
+        allow create: if isAdmin() ||
+          (isMe(customerId) && request.resource.data.from == customerId);
+      }
+    }
+
+    // الإشعارات
+    match /notifications/{id} {
+      allow read: if isAdmin() ||
+        (signedIn() && resource.data.to in [request.auth.uid, 'all']);
+      allow create: if isAdmin() || (signedIn() && request.resource.data.to == 'admin');
+      allow delete: if isAdmin();
+    }
+  }
+}
