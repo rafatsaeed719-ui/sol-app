@@ -18,6 +18,69 @@ class CustomerHome extends StatefulWidget {
 
 class _CustomerHomeState extends State<CustomerHome> {
   int tab = 0;
+  bool welcomeChecked = false;
+
+  /// رسالة الترحيب — بتظهر مرة واحدة بس أول ما المحل يسجّل
+  void _maybeWelcome(Map<String, dynamic> me) {
+    if (welcomeChecked || me.isEmpty) return;
+    welcomeChecked = true;
+    if (me['welcomeShown'] == true) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (c) => Dialog(
+          backgroundColor: kPrimary,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: kAccent, width: 1.2)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 26, 22, 18),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.asset('assets/logo.png', width: 120, height: 120),
+              ),
+              const SizedBox(height: 16),
+              const Text('✨ أهلاً بيك في SOL ✨',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: kAccent, fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 14),
+              const Text(
+                  'عالم من العطور الفاخرة، حيث كل رشة بتحكي عنك، وكل عطر بيسيب بصمة متتنسيش. ❤️',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white, fontSize: 16, height: 1.6)),
+              const SizedBox(height: 12),
+              const Text('اكتشف عطرك، وخلّي حضورك مختلف.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70, fontSize: 15)),
+              const SizedBox(height: 16),
+              const Text('SOL — عطرك، بصمتك. 💎',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: kAccent, fontSize: 17, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: kAccent, foregroundColor: kPrimary),
+                  onPressed: () => Navigator.pop(c),
+                  child: const Text('يلا نبدأ',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ]),
+          ),
+        ),
+      );
+      try {
+        await db.collection('users').doc(uid).update({'welcomeShown': true});
+      } catch (_) {}
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +89,7 @@ class _CustomerHomeState extends State<CustomerHome> {
         stream: db.collection('users').doc(uid).snapshots(),
         builder: (context, snap) {
           final me = snap.data?.data() ?? <String, dynamic>{};
+          _maybeWelcome(me);
           final pages = [
             const CatalogScreen(),
             const OffersScreen(),

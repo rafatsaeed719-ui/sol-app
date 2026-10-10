@@ -42,7 +42,7 @@ class SolApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF5F7FA),
         appBarTheme: const AppBarTheme(
           backgroundColor: kPrimary,
-          foregroundColor: Colors.white,
+          foregroundColor: kAccent,
           centerTitle: true,
         ),
         cardTheme: CardThemeData(

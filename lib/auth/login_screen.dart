@@ -75,17 +75,9 @@ class _LoginScreenState extends State<LoginScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(children: [
-              Container(
-                width: 110,
-                height: 110,
-                decoration: const BoxDecoration(color: kPrimary, shape: BoxShape.circle),
-                alignment: Alignment.center,
-                child: const Text('SOL',
-                    style: TextStyle(
-                        color: kAccent,
-                        fontSize: 34,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2)),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Image.asset('assets/logo.png', width: 180, height: 180),
               ),
               const SizedBox(height: 14),
               const Text('اطلب بضاعتك بسهولة',

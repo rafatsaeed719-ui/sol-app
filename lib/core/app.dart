@@ -11,8 +11,8 @@ import 'package:intl/intl.dart' as intl;
 const String kAdminEmail = 'rafatsaeed719@gmail.com';
 const String kBrand = 'SOL';
 
-const Color kPrimary = Color(0xFF0B3C5D);
-const Color kAccent = Color(0xFFF2A541);
+const Color kPrimary = Color(0xFF141414); // أسود البراند
+const Color kAccent = Color(0xFFC9A54C); // دهبي البراند
 const Color kDanger = Color(0xFFC0392B);
 const Color kSuccess = Color(0xFF1E8449);
 
