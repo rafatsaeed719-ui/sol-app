@@ -51,6 +51,9 @@ jobs:
       - name: App icon
         run: dart run flutter_launcher_icons
 
+      - name: Sample invoice PDF
+        run: flutter test tool/pdf_preview_test.dart
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
@@ -80,4 +83,5 @@ jobs:
           files: |
             SOL.apk
             SOL-arm64.apk
+            SOL-invoice-sample.pdf
           make_latest: true

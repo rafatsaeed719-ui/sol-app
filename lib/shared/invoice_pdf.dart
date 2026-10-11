@@ -46,6 +46,13 @@ String _pct(dynamic v) {
   return '${d.toStringAsFixed(d % 1 == 0 ? 0 : 1)}%';
 }
 
+/// للاختبار: تحميل الخط واللوجو من برّه
+void setPdfAssets(pw.Font regular, pw.Font bold, pw.MemoryImage logo) {
+  _regular = regular;
+  _bold = bold;
+  _logo = logo;
+}
+
 Future<Uint8List> buildInvoicePdf(String invoiceId) async {
   await _loadAssets();
   final inv = (await db.collection('invoices').doc(invoiceId).get()).data();
@@ -62,7 +69,11 @@ Future<Uint8List> buildInvoicePdf(String invoiceId) async {
       .toList()
     ..sort((a, b) => (tsToDate(a['createdAt']) ?? DateTime(2100))
         .compareTo(tsToDate(b['createdAt']) ?? DateTime(2100)));
+  return renderInvoicePdf(inv, user, pays);
+}
 
+Future<Uint8List> renderInvoicePdf(Map<String, dynamic> inv, Map<String, dynamic> user,
+    List<Map<String, dynamic>> pays) async {
   final items = List<Map<String, dynamic>>.from(
       (inv['items'] as List? ?? []).map((e) => Map<String, dynamic>.from(e)));
   final hasReturns = items.any((e) => toI(e['returnedQty']) > 0);
