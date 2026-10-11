@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app.dart';
 import '../core/data.dart';
+import 'invoice_pdf.dart';
 
 /// كارت فاتورة صغير في القوائم
 class InvoiceTile extends StatelessWidget {
@@ -47,9 +48,43 @@ class InvoiceTile extends StatelessWidget {
   }
 }
 
-class InvoiceScreen extends StatelessWidget {
+class InvoiceScreen extends StatefulWidget {
   final String invoiceId;
-  const InvoiceScreen({super.key, required this.invoiceId});
+  final bool offerShare; // بعد إنشاء الفاتورة على طول
+  const InvoiceScreen({super.key, required this.invoiceId, this.offerShare = false});
+  @override
+  State<InvoiceScreen> createState() => _InvoiceScreenState();
+}
+
+class _InvoiceScreenState extends State<InvoiceScreen> {
+  String get invoiceId => widget.invoiceId;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.offerShare) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        final go = await showDialog<bool>(
+          context: context,
+          builder: (c) => AlertDialog(
+            icon: const Icon(Icons.check_circle, color: kSuccess, size: 48),
+            title: const Text('الفاتورة جاهزة'),
+            content: const Text('تبعت الفاتورة للعميل PDF (واتساب أو أي برنامج)؟'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('بعدين')),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(c, true),
+                icon: const Icon(Icons.share),
+                label: const Text('ابعت الفاتورة'),
+              ),
+            ],
+          ),
+        );
+        if (go == true && mounted) await shareInvoicePdf(context, invoiceId);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +103,21 @@ class InvoiceScreen extends StatelessWidget {
             (d['items'] as List? ?? []).map((e) => Map<String, dynamic>.from(e)));
         final bal = toD(d['balance']);
         return Scaffold(
-          appBar: AppBar(title: Text('فاتورة رقم ${d['number']}')),
+          appBar: AppBar(
+            title: Text('فاتورة رقم ${d['number']}'),
+            actions: [
+              IconButton(
+                tooltip: 'طباعة / معاينة',
+                onPressed: () => printInvoicePdf(context, invoiceId),
+                icon: const Icon(Icons.print_outlined),
+              ),
+              IconButton(
+                tooltip: 'ابعت الفاتورة PDF',
+                onPressed: () => shareInvoicePdf(context, invoiceId),
+                icon: const Icon(Icons.share),
+              ),
+            ],
+          ),
           body: ListView(padding: const EdgeInsets.only(bottom: 100), children: [
             Card(
               child: Padding(
@@ -85,6 +134,8 @@ class InvoiceScreen extends StatelessWidget {
                   const Divider(),
                   _kv('العميل', d['customerName'] ?? ''),
                   _kv('التاريخ', fmtDate(d['createdAt'], time: true)),
+                  if (toI(d['collectionDays']) > 0)
+                    _kv('مدة التحصيل', '${d['collectionDays']} يوم'),
                   _kv('تاريخ الاستحقاق', fmtDate(d['dueDate'])),
                   if ((d['note'] ?? '').toString().isNotEmpty) _kv('ملاحظات', d['note']),
                 ]),
@@ -97,9 +148,9 @@ class InvoiceScreen extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(children: [
-                  _kv('إجمالي سعر البيع (للجمهور)', money(d['sellTotal'])),
-                  _kv('إجمالي سعر الجملة', money(d['wholesaleTotal'])),
-                  _kv('قيمة الخصم', '- ${money(d['discountTotal'])}', color: kSuccess),
+                  _kv('إجمالي سعر البيع', money(d['sellTotal'])),
+                  _kv('إجمالي الخصم', '- ${money(d['discountTotal'])}', color: kSuccess),
+                  _kv('إجمالي سعر الجملة', money(d['gross'] ?? d['wholesaleTotal'])),
                   if (toI(d['pointsRedeemed']) > 0)
                     _kv('خصم نقاط (${d['pointsRedeemed']} نقطة)', '- ${money(d['redeemValue'])}',
                         color: kSuccess),
@@ -199,9 +250,8 @@ class InvoiceScreen extends StatelessWidget {
           const SizedBox(height: 6),
           Wrap(spacing: 14, runSpacing: 4, children: [
             _mini('سعر البيع', money(it['sellPrice'])),
-            _mini('سعر الجملة', money(it['wholesalePrice'])),
             _mini('الخصم', '${toD(it['discount']).toStringAsFixed(1)}%'),
-            _mini('الصافي للوحدة', money(it['unitNet'])),
+            _mini('سعر الجملة', money(it['unitNet'])),
           ]),
           const SizedBox(height: 6),
           Row(children: [
@@ -409,7 +459,7 @@ class _ReturnScreenState extends State<ReturnScreen> {
             child: ListTile(
               title: Text(items[i]['name'] ?? ''),
               subtitle: Text(
-                  'المتاح للترجيع: ${avail(i)} • الصافي ${money(items[i]['unitNet'])}'),
+                  'المتاح للترجيع: ${avail(i)} • جملة ${money(items[i]['unitNet'])}'),
               trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                 IconButton(
                   onPressed: (qty[i] ?? 0) <= 0

@@ -79,7 +79,7 @@ class CartLine {
     this.offerId,
     this.qty = 1,
   });
-  double get unitNet => netUnit(wholesalePrice, discount);
+  double get unitNet => netUnit(sellPrice, discount, wholesalePrice);
   double get lineTotal => round2(unitNet * qty);
 
   Map<String, dynamic> toItem() => {
@@ -87,7 +87,7 @@ class CartLine {
         'name': name,
         'qty': qty,
         'sellPrice': sellPrice,
-        'wholesalePrice': wholesalePrice,
+        'wholesalePrice': unitNet,
         'discount': discount,
         'unitNet': unitNet,
         if (offerId != null) 'offerId': offerId,
@@ -211,7 +211,7 @@ class InvLine {
     required this.wholesalePrice,
     required this.discount,
   });
-  double get unitNet => netUnit(wholesalePrice, discount);
+  double get unitNet => netUnit(sellPrice, discount, wholesalePrice);
   double get lineTotal => round2(unitNet * qty);
   Map<String, dynamic> toMap() => {
         'productId': productId,
@@ -219,19 +219,21 @@ class InvLine {
         'qty': qty,
         'returnedQty': 0,
         'sellPrice': sellPrice,
-        'wholesalePrice': wholesalePrice,
+        'wholesalePrice': unitNet,
         'discount': discount,
         'unitNet': unitNet,
       };
 }
 
-/// إنشاء فاتورة (من طلب أو يدوي). بيضيف نقاط للعميل ويخصم النقاط المستبدلة.
-Future<int> createInvoice({
+/// إنشاء فاتورة (من طلب أو يدوي). بيضيف نقاط للعميل ويخصم النقاط المستبدلة
+/// وبيخصم الكميات من المخزن. بيرجع (id الفاتورة، رقمها).
+Future<(String, int)> createInvoice({
   required String customerId,
   required String customerName,
   required List<InvLine> lines,
   required DateTime dueDate,
   required AppSettings settings,
+  int collectionDays = 0,
   String? orderId,
   int redeemPoints = 0,
   double paidNow = 0,
@@ -239,9 +241,8 @@ Future<int> createInvoice({
 }) async {
   if (lines.isEmpty) throw 'الفاتورة من غير أصناف';
   final sellTotal = round2(lines.fold(0.0, (a, l) => a + l.sellPrice * l.qty));
-  final wholesaleTotal =
-      round2(lines.fold(0.0, (a, l) => a + l.wholesalePrice * l.qty));
   final gross = round2(lines.fold(0.0, (a, l) => a + l.lineTotal));
+  final wholesaleTotal = gross;
   final redeemValue = settings.valueOf(redeemPoints);
   final usedPoints = settings.pointsForReward <= 0
       ? 0
@@ -267,7 +268,7 @@ Future<int> createInvoice({
       'items': lines.map((e) => e.toMap()).toList(),
       'sellTotal': sellTotal,
       'wholesaleTotal': wholesaleTotal,
-      'discountTotal': round2(wholesaleTotal - gross),
+      'discountTotal': round2(sellTotal - gross),
       'gross': gross,
       'pointsRedeemed': usedPoints,
       'redeemValue': redeemValue,
@@ -278,6 +279,7 @@ Future<int> createInvoice({
       'pointsEarned': earned,
       'note': note,
       'dueDate': Timestamp.fromDate(dueDate),
+      'collectionDays': collectionDays,
       'createdAt': FieldValue.serverTimestamp(),
     });
     tx.set(
@@ -291,13 +293,34 @@ Future<int> createInvoice({
     return n;
   });
 
+  final used = <String, int>{};
+  for (final l in lines) {
+    used[l.productId] = (used[l.productId] ?? 0) - l.qty;
+  }
+  await adjustStock(used);
   if (paidNow > 0) {
     await addPayment(invRef.id, paidNow, note: 'دفعة عند الاستلام');
   }
   await notify(customerId, 'فاتورة جديدة رقم $number',
       'إجمالي ${money(total)} — كسبت $earned نقطة 🎉',
       type: 'invoice', refId: invRef.id);
-  return number;
+  return (invRef.id, number);
+}
+
+/// يزوّد أو يقلل المخزن (بالسالب للخصم). الأصناف اللي مخزنها مش متتبع بتتساب.
+Future<void> adjustStock(Map<String, int> changes) async {
+  final merged = <String, int>{};
+  changes.forEach((k, v) {
+    if (k.isNotEmpty && v != 0) merged[k] = (merged[k] ?? 0) + v;
+  });
+  for (final e in merged.entries) {
+    try {
+      final ref = db.collection('products').doc(e.key);
+      final s = await ref.get();
+      if (!s.exists || s.data()?['stock'] == null) continue;
+      await ref.update({'stock': FieldValue.increment(e.value)});
+    } catch (_) {}
+  }
 }
 
 Future<void> addPayment(String invoiceId, double amount, {String note = ''}) async {
@@ -338,7 +361,9 @@ Future<double> addReturn(String invoiceId, Map<int, int> qtys,
   double amount = 0;
   String customerId = '';
   int number = 0;
+  final back = <String, int>{};
   await db.runTransaction((tx) async {
+    back.clear();
     final s = await tx.get(invRef);
     final d = s.data();
     if (d == null) throw 'الفاتورة مش موجودة';
@@ -358,6 +383,8 @@ Future<double> addReturn(String invoiceId, Map<int, int> qtys,
       it['returnedQty'] = toI(it['returnedQty']) + q;
       final a = round2(toD(it['unitNet']) * q);
       amount += a;
+      final pid = (it['productId'] ?? '').toString();
+      back[pid] = (back[pid] ?? 0) + q;
       retItems.add({
         'productId': it['productId'],
         'name': it['name'],
@@ -386,6 +413,7 @@ Future<double> addReturn(String invoiceId, Map<int, int> qtys,
     tx.set(userRef, {'points': (cur - lost) < 0 ? 0 : cur - lost},
         SetOptions(merge: true));
   });
+  await adjustStock(back);
   await notify(customerId, 'مرتجع على فاتورة $number',
       'تم تسجيل مرتجع بقيمة ${money(amount)}',
       type: 'return', refId: invoiceId);

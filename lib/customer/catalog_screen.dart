@@ -99,7 +99,9 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disc = toD(p['discount']);
-    final net = netUnit(toD(p['wholesalePrice']), disc);
+    final net = netUnit(toD(p['sellPrice']), disc, toD(p['wholesalePrice']));
+    final st = stockOf(p);
+    final out = st != null && st <= 0;
     return Card(
       margin: const EdgeInsets.all(2),
       clipBehavior: Clip.antiAlias,
@@ -131,11 +133,9 @@ class ProductCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text('للجمهور: ${money(p['sellPrice'])}',
-                  style: const TextStyle(fontSize: 11, color: Colors.black54)),
               Row(children: [
                 if (disc > 0)
-                  Text(money(p['wholesalePrice']),
+                  Text(money(p['sellPrice']),
                       style: const TextStyle(
                           fontSize: 11,
                           color: Colors.black45,
@@ -155,12 +155,16 @@ class ProductCard extends StatelessWidget {
               height: 34,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(padding: EdgeInsets.zero),
-                onPressed: () {
-                  Cart.I.addProduct(id, p);
-                  toast(context, 'اتضاف ${p['name']} للسلة');
-                },
-                icon: const Icon(Icons.add_shopping_cart, size: 18),
-                label: const Text('أضف'),
+                onPressed: out
+                    ? null
+                    : () async {
+                        final q = await pickQty(context, p['name'] ?? '', net);
+                        if (q == null || !context.mounted) return;
+                        Cart.I.addProduct(id, p, qty: q);
+                        toast(context, 'اتضاف $q × ${p['name']} للسلة');
+                      },
+                icon: Icon(out ? Icons.block : Icons.add_shopping_cart, size: 18),
+                label: Text(out ? 'نفذت الكمية' : 'أضف'),
               ),
             ),
           ),
@@ -184,7 +188,9 @@ class _ProductDetailState extends State<ProductDetail> {
   Widget build(BuildContext context) {
     final p = widget.p;
     final disc = toD(p['discount']);
-    final net = netUnit(toD(p['wholesalePrice']), disc);
+    final net = netUnit(toD(p['sellPrice']), disc, toD(p['wholesalePrice']));
+    final st = stockOf(p);
+    final out = st != null && st <= 0;
     return Scaffold(
       appBar: AppBar(title: Text(p['name'] ?? '')),
       body: ListView(children: [
@@ -203,10 +209,9 @@ class _ProductDetailState extends State<ProductDetail> {
                 padding: const EdgeInsets.all(12),
                 child: Column(children: [
                   _row('سعر البيع للجمهور', money(p['sellPrice'])),
-                  _row('سعر الجملة', money(p['wholesalePrice'])),
                   _row('نسبة الخصم', '${disc.toStringAsFixed(1)}%'),
                   const Divider(),
-                  _row('سعرك الصافي', money(net), bold: true),
+                  _row('سعر الجملة (سعرك)', money(net), bold: true),
                   _row('مكسبك في القطعة', money(toD(p['sellPrice']) - net),
                       color: kSuccess),
                 ]),
@@ -223,25 +228,18 @@ class _ProductDetailState extends State<ProductDetail> {
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(children: [
-            IconButton.outlined(
-                onPressed: qty > 1 ? () => setState(() => qty--) : null,
-                icon: const Icon(Icons.remove)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text('$qty',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-            IconButton.outlined(
-                onPressed: () => setState(() => qty++), icon: const Icon(Icons.add)),
+            QtyStepper(value: qty, onChanged: (v) => setState(() => qty = v)),
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton(
-                onPressed: () {
+                onPressed: out
+                    ? null
+                    : () {
                   Cart.I.addProduct(widget.id, p, qty: qty);
                   toast(context, 'اتضاف للسلة');
                   Navigator.pop(context);
                 },
-                child: Text('أضف للسلة (${money(net * qty)})'),
+                child: Text(out ? 'نفذت الكمية' : 'أضف للسلة (${money(net * qty)})'),
               ),
             ),
           ]),
@@ -261,4 +259,108 @@ class _ProductDetailState extends State<ProductDetail> {
                   color: color ?? (bold ? kPrimary : null))),
         ]),
       );
+}
+
+
+/// عدّاد كمية: - رقم + ، ودوسة على الرقم تكتب الكمية بإيدك
+class QtyStepper extends StatelessWidget {
+  final int value;
+  final ValueChanged<int> onChanged;
+  final int min;
+  final bool compact;
+  const QtyStepper(
+      {super.key,
+      required this.value,
+      required this.onChanged,
+      this.min = 1,
+      this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      compact
+          ? IconButton(
+              visualDensity: VisualDensity.compact,
+              onPressed: value > min ? () => onChanged(value - 1) : null,
+              icon: const Icon(Icons.remove_circle_outline))
+          : IconButton.outlined(
+              onPressed: value > min ? () => onChanged(value - 1) : null,
+              icon: const Icon(Icons.remove)),
+      InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () async {
+          final c = TextEditingController(text: '$value');
+          final r = await showDialog<int>(
+            context: context,
+            builder: (d) => AlertDialog(
+              title: const Text('اكتب الكمية'),
+              content: TextField(
+                controller: c,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 22),
+                onSubmitted: (v) => Navigator.pop(d, toI(v)),
+              ),
+              actions: [
+                FilledButton(
+                    onPressed: () => Navigator.pop(d, toI(c.text)), child: const Text('تمام')),
+              ],
+            ),
+          );
+          if (r != null && r >= min) onChanged(r);
+        },
+        child: Container(
+          constraints: BoxConstraints(minWidth: compact ? 32 : 56),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 10, vertical: 8),
+          alignment: Alignment.center,
+          child: Text('$value',
+              style: TextStyle(fontSize: compact ? 16 : 20, fontWeight: FontWeight.bold)),
+        ),
+      ),
+      compact
+          ? IconButton(
+              visualDensity: VisualDensity.compact,
+              onPressed: () => onChanged(value + 1),
+              icon: const Icon(Icons.add_circle_outline))
+          : IconButton.outlined(
+              onPressed: () => onChanged(value + 1), icon: const Icon(Icons.add)),
+    ]);
+  }
+}
+
+/// نافذة اختيار الكمية قبل الإضافة للسلة
+Future<int?> pickQty(BuildContext context, String name, double unit) {
+  var q = 1;
+  return showModalBottomSheet<int>(
+    context: context,
+    builder: (c) => StatefulBuilder(
+      builder: (c, set) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('سعر القطعة ${money(unit)}', style: const TextStyle(color: Colors.black54)),
+            const SizedBox(height: 16),
+            QtyStepper(value: q, onChanged: (v) => set(() => q = v)),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, children: [
+              for (final n in const [6, 12, 24, 50])
+                ActionChip(label: Text('$n'), onPressed: () => set(() => q = n)),
+            ]),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton.icon(
+                onPressed: () => Navigator.pop(c, q),
+                icon: const Icon(Icons.add_shopping_cart),
+                label: Text('أضف $q للسلة — ${money(unit * q)}'),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    ),
+  );
 }

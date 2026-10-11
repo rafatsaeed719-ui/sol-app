@@ -74,9 +74,13 @@ DateTime? tsToDate(dynamic ts) {
   return null;
 }
 
-/// سعر الوحدة الصافي للمحل = سعر الجملة بعد خصم النسبة
-double netUnit(double wholesale, double discount) =>
-    round2(wholesale * (1 - discount / 100));
+/// سعر الجملة (اللي المحل بيدفعه) = سعر البيع ناقص نسبة الخصم.
+/// لو سعر البيع مش متسجل بيرجع للقيمة القديمة (fallback).
+double netUnit(double sell, double discount, [double fallback = 0]) =>
+    sell > 0 ? round2(sell * (1 - discount / 100)) : fallback;
+
+/// المخزن: null يعني الصنف مش متتبع مخزنه
+int? stockOf(Map<String, dynamic> p) => p['stock'] == null ? null : toI(p['stock']);
 
 void toast(BuildContext context, String msg, {bool error = false}) {
   ScaffoldMessenger.of(context).hideCurrentSnackBar();

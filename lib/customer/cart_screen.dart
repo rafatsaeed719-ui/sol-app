@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app.dart';
 import '../core/data.dart';
+import 'catalog_screen.dart';
 
 class CartScreen extends StatefulWidget {
   final Map<String, dynamic> me;
@@ -67,26 +68,18 @@ class _CartScreenState extends State<CartScreen> {
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(l.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                         Text(
-                            'جملة ${money(l.wholesalePrice)} • خصم ${l.discount.toStringAsFixed(1)}%',
+                            'سعر البيع ${money(l.sellPrice)} • خصم ${l.discount.toStringAsFixed(1)}%',
                             style: const TextStyle(fontSize: 12, color: Colors.black54)),
-                        Text('الصافي ${money(l.unitNet)} × ${l.qty} = ${money(l.lineTotal)}',
+                        Text('جملة ${money(l.unitNet)} × ${l.qty} = ${money(l.lineTotal)}',
                             style: const TextStyle(color: kPrimary, fontWeight: FontWeight.w600)),
                       ]),
                     ),
                     Column(children: [
-                      Row(mainAxisSize: MainAxisSize.min, children: [
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => Cart.I.setQty(l.key, l.qty - 1),
-                          icon: const Icon(Icons.remove_circle_outline),
-                        ),
-                        Text('${l.qty}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => Cart.I.setQty(l.key, l.qty + 1),
-                          icon: const Icon(Icons.add_circle_outline),
-                        ),
-                      ]),
+                      QtyStepper(
+                          compact: true,
+                          value: l.qty,
+                          min: 0,
+                          onChanged: (v) => Cart.I.setQty(l.key, v)),
                     ]),
                   ]),
                 ),

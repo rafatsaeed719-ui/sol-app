@@ -31,6 +31,20 @@ jobs:
           rm -rf test
           python3 tool/patch_android.py
 
+      - name: Download Arabic font for PDF invoices
+        run: |
+          mkdir -p assets/fonts
+          for w in Regular Bold; do
+            curl -fsSL -o assets/fonts/Amiri-$w.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-$w.ttf"
+          done
+          pip install fonttools >/dev/null
+          python3 -c "
+          from fontTools.ttLib import TTFont
+          for w in ['Regular','Bold']:
+              c = TTFont(f'assets/fonts/Amiri-{w}.ttf').getBestCmap()
+              assert 0x0628 in c and 0xFE91 in c, 'missing arabic glyphs'
+          print('fonts ok')"
+
       - name: Get packages
         run: flutter pub get
 

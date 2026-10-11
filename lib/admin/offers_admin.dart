@@ -179,7 +179,7 @@ class _OfferFormState extends State<OfferForm> {
             for (final d in products) {
               if (d.id == v) {
                 productName = d.data()['name'] ?? '';
-                if (discount.text.isEmpty) {
+                if (discount.text.isEmpty || toD(discount.text) == 0) {
                   discount.text = toD(d.data()['discount']).toString();
                 }
               }
@@ -209,7 +209,7 @@ class _OfferFormState extends State<OfferForm> {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-                'جملة ${money(p['wholesalePrice'])} ← سعر العرض للوحدة ${money(netUnit(toD(p['wholesalePrice']), toD(discount.text)))}',
+                'سعر البيع ${money(p['sellPrice'])} ← سعر العرض للمحل ${money(netUnit(toD(p['sellPrice']), toD(discount.text), toD(p['wholesalePrice'])))}',
                 style: const TextStyle(color: kPrimary, fontWeight: FontWeight.bold)),
           ),
         const SizedBox(height: 8),

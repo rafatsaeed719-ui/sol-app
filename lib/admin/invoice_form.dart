@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app.dart';
 import '../core/data.dart';
+import '../shared/invoice_view.dart';
 
 class InvoiceForm extends StatefulWidget {
   final String customerId;
@@ -23,6 +24,8 @@ class _InvoiceFormState extends State<InvoiceForm> {
   final lines = <InvLine>[];
   AppSettings settings = const AppSettings();
   DateTime? due;
+  final days = TextEditingController();
+  Map<String, int?> stocks = {};
   int customerPoints = 0;
   int redeem = 0;
   final paidNow = TextEditingController();
@@ -49,13 +52,36 @@ class _InvoiceFormState extends State<InvoiceForm> {
   Future<void> _load() async {
     final s = await getSettings();
     final u = await db.collection('users').doc(widget.customerId).get();
+    final ps = await db.collection('products').get();
     if (!mounted) return;
     setState(() {
       settings = s;
       customerPoints = toI(u.data()?['points']);
-      due = DateTime.now().add(Duration(days: s.collectionDays));
+      final d = u.data()?['collectionDays'] != null
+          ? toI(u.data()?['collectionDays'])
+          : s.collectionDays;
+      days.text = '$d';
+      due = _dueFor(d);
+      stocks = {for (final p in ps.docs) p.id: stockOf(p.data())};
       loaded = true;
     });
+  }
+
+  DateTime _dueFor(int d) {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day).add(Duration(days: d));
+  }
+
+  /// كمية الصنف في الفاتورة كلها (لو متكرر)
+  int _qtyOf(String pid) =>
+      lines.where((l) => l.productId == pid).fold(0, (a, l) => a + l.qty);
+
+  String? _stockWarn(InvLine l) {
+    final st = stocks[l.productId];
+    if (st == null) return null;
+    final need = _qtyOf(l.productId);
+    if (need > st) return '⚠️ المخزن فيه $st بس';
+    return 'المخزن: $st';
   }
 
   double get gross => round2(lines.fold(0.0, (a, l) => a + l.lineTotal));
@@ -72,7 +98,8 @@ class _InvoiceFormState extends State<InvoiceForm> {
       context: context,
       isScrollControlled: true,
       builder: (c) => _ProductPicker(names: [
-        for (final d in docs) '${d.data()['name']} — جملة ${money(d.data()['wholesalePrice'])}'
+        for (final d in docs)
+          '${d.data()['name']} — جملة ${money(netUnit(toD(d.data()['sellPrice']), toD(d.data()['discount']), toD(d.data()['wholesalePrice'])))}${stockOf(d.data()) == null ? '' : ' • مخزن ${stockOf(d.data())}'}'
       ]),
     );
     if (picked == null) return;
@@ -93,7 +120,6 @@ class _InvoiceFormState extends State<InvoiceForm> {
     final l = lines[i];
     final q = TextEditingController(text: '${l.qty}');
     final sp = TextEditingController(text: _n(l.sellPrice));
-    final wp = TextEditingController(text: _n(l.wholesalePrice));
     final dc = TextEditingController(text: _n(l.discount));
     final ok = await showDialog<bool>(
       context: context,
@@ -103,8 +129,9 @@ class _InvoiceFormState extends State<InvoiceForm> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             _num(q, 'الكمية'),
             _num(sp, 'سعر البيع'),
-            _num(wp, 'سعر الجملة'),
             _num(dc, 'نسبة الخصم %'),
+            const Text('سعر الجملة بيتحسب لوحده = سعر البيع − الخصم',
+                style: TextStyle(fontSize: 12, color: Colors.black54)),
           ]),
         ),
         actions: [
@@ -123,7 +150,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
       setState(() {
         l.qty = toI(q.text) < 1 ? 1 : toI(q.text);
         l.sellPrice = toD(sp.text);
-        l.wholesalePrice = toD(wp.text);
+        l.wholesalePrice = netUnit(toD(sp.text), toD(dc.text), l.wholesalePrice);
         l.discount = toD(dc.text).clamp(0, 100).toDouble();
       });
     }
@@ -147,20 +174,24 @@ class _InvoiceFormState extends State<InvoiceForm> {
     }
     setState(() => busy = true);
     try {
-      final n = await createInvoice(
+      final (id, n) = await createInvoice(
         customerId: widget.customerId,
         customerName: widget.customerName,
         lines: lines,
         dueDate: due ?? DateTime.now(),
         settings: settings,
+        collectionDays: toI(days.text),
         orderId: widget.orderId,
         redeemPoints: redeem,
         paidNow: toD(paidNow.text),
         note: note.text.trim(),
       );
       if (!mounted) return;
+      Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (_) => InvoiceScreen(invoiceId: id, offerShare: true)));
       toast(context, 'اتعملت الفاتورة رقم $n ✔');
-      Navigator.pop(context);
     } catch (e) {
       if (mounted) toast(context, '$e', error: true);
     }
@@ -190,7 +221,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
                     title: Text(lines[i].name,
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text(
-                        'بيع ${money(lines[i].sellPrice)} • جملة ${money(lines[i].wholesalePrice)} • خصم ${lines[i].discount.toStringAsFixed(1)}%\nصافي ${money(lines[i].unitNet)} × ${lines[i].qty} = ${money(lines[i].lineTotal)}'),
+                        'بيع ${money(lines[i].sellPrice)} • خصم ${lines[i].discount.toStringAsFixed(1)}% • جملة ${money(lines[i].unitNet)}\n${lines[i].qty} × ${money(lines[i].unitNet)} = ${money(lines[i].lineTotal)}${_stockWarn(lines[i]) == null ? '' : '   ${_stockWarn(lines[i])}'}'),
                     isThreeLine: true,
                     trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                       IconButton(
@@ -213,19 +244,51 @@ class _InvoiceFormState extends State<InvoiceForm> {
                   ),
                 ),
               const SectionTitle('التحصيل'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: days,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                          labelText: 'عدد أيام التحصيل',
+                          prefixIcon: Icon(Icons.timer_outlined)),
+                      onChanged: (v) => setState(() => due = _dueFor(toI(v))),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  for (final d in const [7, 15, 30])
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: ChoiceChip(
+                        label: Text('$d'),
+                        selected: toI(days.text) == d,
+                        onSelected: (_) => setState(() {
+                          days.text = '$d';
+                          due = _dueFor(d);
+                        }),
+                      ),
+                    ),
+                ]),
+              ),
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.event, color: kPrimary),
                   title: Text('ميعاد التحصيل: ${fmtDate(due)}'),
-                  subtitle: Text(
-                      'بعد ${due == null ? 0 : due!.difference(DateTime.now()).inDays + 1} يوم — دوس للتغيير'),
+                  subtitle: const Text('دوس لو عاوز تختار تاريخ معيّن'),
                   onTap: () async {
                     final p = await showDatePicker(
                         context: context,
                         initialDate: due ?? DateTime.now(),
                         firstDate: DateTime.now().subtract(const Duration(days: 1)),
                         lastDate: DateTime(2035));
-                    if (p != null) setState(() => due = p);
+                    if (p != null) {
+                      setState(() {
+                        due = p;
+                        days.text = '${p.difference(_dueFor(0)).inDays}';
+                      });
+                    }
                   },
                 ),
               ),

@@ -75,6 +75,30 @@ class _Profile extends StatelessWidget {
   final Map<String, dynamic> m;
   const _Profile({required this.customerId, required this.m});
 
+  Future<void> setDays(BuildContext context) async {
+    final c = TextEditingController(
+        text: m['collectionDays'] == null ? '' : '${toI(m['collectionDays'])}');
+    final r = await showDialog<String>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('أيام التحصيل للعميل ده'),
+        content: TextField(
+          controller: c,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+              labelText: 'عدد الأيام', helperText: 'سيبها فاضية عشان ياخد الافتراضي'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(d, c.text), child: const Text('حفظ')),
+        ],
+      ),
+    );
+    if (r == null) return;
+    await db.collection('users').doc(customerId).update(
+        {'collectionDays': r.trim().isEmpty ? FieldValue.delete() : toI(r)});
+  }
+
   Future<void> adjustPoints(BuildContext context) async {
     final c = TextEditingController(text: '${toI(m['points'])}');
     final ok = await showDialog<bool>(
@@ -136,6 +160,14 @@ class _Profile extends StatelessWidget {
             title: Text('النقاط: ${toI(m['points'])}'),
             trailing: TextButton(
                 onPressed: () => adjustPoints(context), child: const Text('تعديل')),
+          ),
+          ListTile(
+            leading: const Icon(Icons.timer_outlined),
+            title: Text(m['collectionDays'] == null
+                ? 'أيام التحصيل: الافتراضي من الإعدادات'
+                : 'أيام التحصيل: ${toI(m['collectionDays'])} يوم'),
+            trailing: TextButton(
+                onPressed: () => setDays(context), child: const Text('تعديل')),
           ),
           ListTile(
               leading: const Icon(Icons.calendar_today),
