@@ -141,7 +141,7 @@ service cloud.firestore {
       allow create: if isSuper()
         || (signedIn() && request.resource.data.to == 'admin_' + myStore())
         || canManage(request.resource.data.storeId);
-      allow delete: if isSuper() || canManage(resource.data.storeId);
+      allow update, delete: if isSuper() || canManage(resource.data.storeId);
     }
   }
 }
