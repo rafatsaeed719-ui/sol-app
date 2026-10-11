@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart' as intl;
 
 /// إيميل المدير — أي حد يدخل بالإيميل ده يفتح له لوحة التحكم.
 const String kAdminEmail = 'rafatsaeed719@gmail.com';
@@ -53,19 +52,36 @@ int toI(dynamic v) {
 
 double round2(double v) => (v * 100).roundToDouble() / 100;
 
+String _two(int n) => n.toString().padLeft(2, '0');
+
+/// 1234.5 -> "1,234.5 ج"
 String money(dynamic v) {
-  final d = toD(v);
-  final f = intl.NumberFormat('#,##0.##', 'en');
-  return '${f.format(d)} ج';
+  final d = round2(toD(v));
+  final neg = d < 0;
+  final abs = d.abs();
+  final whole = abs.truncate();
+  final frac = ((abs - whole) * 100).round();
+  final digits = whole.toString();
+  final buf = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 == 0) buf.write(',');
+    buf.write(digits[i]);
+  }
+  var out = buf.toString();
+  if (frac > 0) {
+    out += '.${frac % 10 == 0 ? (frac ~/ 10).toString() : _two(frac)}';
+  }
+  return '${neg ? '-' : ''}$out ج';
 }
 
+/// 2026/10/11  أو  2026/10/11  02:30 م
 String fmtDate(dynamic ts, {bool time = false}) {
-  DateTime? d;
-  if (ts is Timestamp) d = ts.toDate();
-  if (ts is DateTime) d = ts;
+  final d = tsToDate(ts);
   if (d == null) return '-';
-  return intl.DateFormat(time ? 'yyyy/MM/dd  hh:mm a' : 'yyyy/MM/dd', 'en')
-      .format(d);
+  final date = '${d.year}/${_two(d.month)}/${_two(d.day)}';
+  if (!time) return date;
+  final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+  return '$date  ${_two(h)}:${_two(d.minute)} ${d.hour < 12 ? 'ص' : 'م'}';
 }
 
 DateTime? tsToDate(dynamic ts) {
