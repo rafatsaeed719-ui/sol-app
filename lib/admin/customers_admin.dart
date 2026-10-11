@@ -33,12 +33,12 @@ class _CustomersAdminState extends State<CustomersAdmin> {
 
   Widget _list(BuildContext context) {
     return StreamBuilder(
-      stream: db.collection('users').snapshots(),
+      stream: scoped('users').snapshots(),
       builder: (context, us) {
         if (us.hasError) return EmptyView('حصلت مشكلة: ${us.error}');
         if (!us.hasData) return const Loading();
         return StreamBuilder(
-          stream: db.collection('invoices').snapshots(),
+          stream: scoped('invoices').snapshots(),
           builder: (context, inv) {
             final byCustomer = <String, List<Map<String, dynamic>>>{};
             for (final d in inv.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[]) {
@@ -49,6 +49,7 @@ class _CustomersAdminState extends State<CustomersAdmin> {
               for (final e in byCustomer.entries) e.key: summarize(e.value),
             };
             var list = us.data!.docs.where((d) {
+              if (d.data()['role'] == 'owner') return false;
               if (q.isEmpty) return true;
               final m = d.data();
               final hay = '${m['shopName']} ${m['ownerName']} ${m['phone']} ${m['address']}'

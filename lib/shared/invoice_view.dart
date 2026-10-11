@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../core/app.dart';
 import '../core/data.dart';
 import 'invoice_pdf.dart';
+import '../admin/invoice_form.dart';
 
 /// كارت فاتورة صغير في القوائم
 class InvoiceTile extends StatelessWidget {
@@ -124,9 +125,14 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 padding: const EdgeInsets.all(14),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
-                    const Text('SOL',
-                        style: TextStyle(
-                            fontSize: 26, fontWeight: FontWeight.w900, color: kPrimary)),
+                    const StoreLogo(size: 40, radius: 8),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(storeName,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.w900, color: kPrimary)),
+                    ),
                     const Spacer(),
                     Text('رقم ${d['number']}',
                         style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -206,6 +212,55 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                           icon: const Icon(Icons.assignment_return),
                           label: const Text('مرتجع'),
                         ),
+                      ),
+                      PopupMenuButton<String>(
+                        tooltip: 'المزيد',
+                        onSelected: (v) async {
+                          if (v == 'edit') {
+                            if (toD(d['returned']) > 0) {
+                              toast(context,
+                                  'الفاتورة عليها مرتجع — مينفعش تعدّل أصنافها. احذفها واعمل واحدة جديدة',
+                                  error: true);
+                              return;
+                            }
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => InvoiceForm(
+                                          customerId: d['customerId'],
+                                          customerName: d['customerName'] ?? '',
+                                          editId: invoiceId,
+                                          editData: d,
+                                        )));
+                          } else if (v == 'delete') {
+                            final ok = await confirm(
+                                context,
+                                'حذف الفاتورة رقم ${d['number']}',
+                                'هتتمسح الفاتورة ودفعاتها ومرتجعاتها، والبضاعة هترجع المخزن، ونقاط العميل هتتظبط.\n\nمتأكد؟');
+                            if (!ok || !context.mounted) return;
+                            try {
+                              await deleteInvoice(invoiceId, await getSettings());
+                              if (context.mounted) {
+                                toast(context, 'اتحذفت الفاتورة');
+                                Navigator.pop(context);
+                              }
+                            } catch (e) {
+                              if (context.mounted) toast(context, '$e', error: true);
+                            }
+                          }
+                        },
+                        itemBuilder: (c) => const [
+                          PopupMenuItem(
+                              value: 'edit',
+                              child: ListTile(
+                                  leading: Icon(Icons.edit), title: Text('تعديل الفاتورة'))),
+                          PopupMenuItem(
+                              value: 'delete',
+                              child: ListTile(
+                                  leading: Icon(Icons.delete_forever, color: kDanger),
+                                  title: Text('حذف الفاتورة',
+                                      style: TextStyle(color: kDanger)))),
+                        ],
                       ),
                       IconButton(
                         tooltip: 'تغيير ميعاد التحصيل',
@@ -293,8 +348,7 @@ class _MovementList extends StatelessWidget {
   final String invoiceId, customerId;
   const _MovementList({required this.invoiceId, required this.customerId});
 
-  Query<Map<String, dynamic>> _q(String col) => db
-      .collection(col)
+  Query<Map<String, dynamic>> _q(String col) => scoped(col)
       .where('customerId', isEqualTo: customerId)
       .where('invoiceId', isEqualTo: invoiceId);
 

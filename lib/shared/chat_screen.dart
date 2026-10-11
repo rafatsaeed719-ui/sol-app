@@ -32,7 +32,7 @@ class _ChatViewState extends State<ChatView> {
         await notify('admin', 'رسالة من ${widget.customerName}', t,
             type: 'chat', refId: widget.customerId);
       } else {
-        await notify(widget.customerId, 'رسالة من $kBrand 💬', t,
+        await notify(widget.customerId, 'رسالة من $storeName 💬', t,
             type: 'chat', refId: widget.customerId);
       }
     } catch (e) {

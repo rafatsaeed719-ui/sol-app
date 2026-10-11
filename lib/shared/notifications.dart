@@ -9,8 +9,8 @@ import '../core/data.dart';
 
 Query<Map<String, dynamic>> myNotificationsQuery() {
   final c = db.collection('notifications');
-  if (isAdmin) return c.where('to', isEqualTo: 'admin');
-  return c.where('to', whereIn: [uid, 'all']);
+  if (isAdmin) return c.where('to', isEqualTo: 'admin_$sid');
+  return c.where('to', whereIn: [uid, 'all_$sid']);
 }
 
 class NotifCenter extends ChangeNotifier {
@@ -24,7 +24,7 @@ class NotifCenter extends ChangeNotifier {
   final _incoming = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get incoming => _incoming.stream;
 
-  String get _key => 'lastSeen_$uid';
+  String get _key => 'lastSeen_${uid}_$sid';
 
   Future<void> start() async {
     await _sub?.cancel();

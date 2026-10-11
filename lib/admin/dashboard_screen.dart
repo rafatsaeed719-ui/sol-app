@@ -6,6 +6,8 @@ import '../core/app.dart';
 import '../core/data.dart';
 import '../shared/invoice_view.dart';
 import 'customer_detail.dart';
+import 'expenses_screen.dart';
+import 'warehouse_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   final void Function(int tab) onGo;
@@ -14,7 +16,7 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
-      stream: db.collection('invoices').snapshots(),
+      stream: scoped('invoices').snapshots(),
       builder: (context, inv) {
         if (inv.hasError) return EmptyView('حصلت مشكلة: ${inv.error}');
         if (!inv.hasData) return const Loading();
@@ -31,13 +33,15 @@ class DashboardScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(8),
             child: StreamBuilder(
-              stream: db.collection('orders').where('status', isEqualTo: 'new').snapshots(),
+              stream: scoped('orders').where('status', isEqualTo: 'new').snapshots(),
               builder: (context, o) {
                 final newOrders = o.data?.docs.length ?? 0;
                 return StreamBuilder(
-                  stream: db.collection('users').snapshots(),
+                  stream: scoped('users').snapshots(),
                   builder: (context, u) {
-                    final customers = u.data?.docs.length ?? 0;
+                    final customers = (u.data?.docs ?? [])
+                        .where((d) => d.data()['role'] != 'owner')
+                        .length;
                     return GridView.count(
                       crossAxisCount: 2,
                       shrinkWrap: true,
@@ -64,6 +68,80 @@ class DashboardScreen extends StatelessWidget {
                 );
               },
             ),
+          ),
+          // المصروفات والتحصيل الشهر ده
+          StreamBuilder(
+            stream: scoped('expenses').snapshots(),
+            builder: (context, ex) {
+              final monthExp = (ex.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+                  .where((d) => (tsToDate(d.data()['date']) ?? now).isAfter(monthStart))
+                  .fold(0.0, (a, d) => a + toD(d.data()['amount']));
+              return StreamBuilder(
+                stream: scoped('payments').snapshots(),
+                builder: (context, ps) {
+                  final monthPaid = (ps.data?.docs ??
+                          <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+                      .where((d) => (tsToDate(d.data()['createdAt']) ?? now).isAfter(monthStart))
+                      .fold(0.0, (a, d) => a + toD(d.data()['amount']));
+                  final net = monthPaid - monthExp;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(children: [
+                      Expanded(
+                        child: StatTile('مصروفات الشهر', money(monthExp),
+                            color: kDanger,
+                            icon: Icons.account_balance_wallet,
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const ExpensesScreen()))),
+                      ),
+                      Expanded(
+                        child: StatTile('تحصيل − مصروفات', money(net),
+                            color: net >= 0 ? kSuccess : kDanger, icon: Icons.savings),
+                      ),
+                    ]),
+                  );
+                },
+              );
+            },
+          ),
+          // أصناف قربت تخلص
+          StreamBuilder(
+            stream: scoped('products').snapshots(),
+            builder: (context, ps) {
+              final low = (ps.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+                  .where((d) {
+                final st = stockOf(d.data());
+                return st != null && st <= lowOf(d.data());
+              }).toList()
+                ..sort((a, b) => stockOf(a.data())!.compareTo(stockOf(b.data())!));
+              if (low.isEmpty) return const SizedBox();
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                SectionTitle('📦 أصناف قربت تخلص (${low.length})',
+                    trailing: TextButton(
+                        onPressed: () => Navigator.push(context,
+                            MaterialPageRoute(builder: (_) => const WarehouseScreen())),
+                        child: const Text('المخزن'))),
+                for (final d in low.take(8))
+                  Card(
+                    color: stockOf(d.data())! <= 0 ? const Color(0xFFFDECEA) : const Color(0xFFFFF4E0),
+                    child: ListTile(
+                      dense: true,
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  ProductMovesScreen(productId: d.id, product: d.data()))),
+                      leading: Icon(
+                          stockOf(d.data())! <= 0 ? Icons.remove_shopping_cart : Icons.warning_amber,
+                          color: stockOf(d.data())! <= 0 ? kDanger : Colors.orange),
+                      title: Text((d.data()['name'] ?? '').toString()),
+                      trailing: Text(
+                          stockOf(d.data())! <= 0 ? 'خلص' : 'باقي ${stockOf(d.data())}',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+              ]);
+            },
           ),
           SectionTitle('⚠️ عملاء عليهم فلوس متأخرة (${overdue.length})'),
           if (overdue.isEmpty)
@@ -100,7 +178,7 @@ class DashboardScreen extends StatelessWidget {
           }),
           const SectionTitle('آخر الطلبات'),
           StreamBuilder(
-            stream: db.collection('orders').where('status', isEqualTo: 'new').snapshots(),
+            stream: scoped('orders').where('status', isEqualTo: 'new').snapshots(),
             builder: (context, o) {
               final docs = o.hasData
                   ? sortByDate(o.data!.docs)

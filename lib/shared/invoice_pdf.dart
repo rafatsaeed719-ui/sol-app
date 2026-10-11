@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart' show BuildContext;
@@ -59,8 +60,7 @@ Future<Uint8List> buildInvoicePdf(String invoiceId) async {
   if (inv == null) throw 'الفاتورة مش موجودة';
   final customerId = (inv['customerId'] ?? '').toString();
   final user = (await db.collection('users').doc(customerId).get()).data() ?? {};
-  final pays = (await db
-          .collection('payments')
+  final pays = (await scoped('payments')
           .where('customerId', isEqualTo: customerId)
           .where('invoiceId', isEqualTo: invoiceId)
           .get())
@@ -74,6 +74,16 @@ Future<Uint8List> buildInvoicePdf(String invoiceId) async {
 
 Future<Uint8List> renderInvoicePdf(Map<String, dynamic> inv, Map<String, dynamic> user,
     List<Map<String, dynamic>> pays) async {
+  // لوجو واسم المحل الحالي
+  final storeLogoB64 = (Session.store['logo'] ?? '').toString();
+  pw.ImageProvider? logo;
+  if (storeLogoB64.isNotEmpty) {
+    logo = pw.MemoryImage(base64Decode(storeLogoB64));
+  } else if (sid == kMainStore) {
+    logo = _logo;
+  }
+  final brand = storeName;
+  final slogan = storeSlogan;
   final items = List<Map<String, dynamic>>.from(
       (inv['items'] as List? ?? []).map((e) => Map<String, dynamic>.from(e)));
   final hasReturns = items.any((e) => toI(e['returnedQty']) > 0);
@@ -89,8 +99,8 @@ Future<Uint8List> renderInvoicePdf(Map<String, dynamic> inv, Map<String, dynamic
   final totalQty = items.fold(0, (a, e) => a + toI(e['qty']));
 
   final doc = pw.Document(
-    title: 'SOL Invoice ${inv['number']}',
-    author: 'SOL Perfume',
+    title: 'Invoice ${inv['number']}',
+    author: brand,
     theme: pw.ThemeData.withFont(base: _regular, bold: _bold),
   );
 
@@ -207,17 +217,21 @@ Future<Uint8List> renderInvoicePdf(Map<String, dynamic> inv, Map<String, dynamic
       padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: pw.BoxDecoration(color: _black, borderRadius: pw.BorderRadius.circular(8)),
       child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
-        pw.Container(
-          width: 70,
-          height: 70,
-          child: pw.Image(_logo!, fit: pw.BoxFit.cover),
-        ),
+        if (logo != null)
+          pw.Container(
+            width: 70,
+            height: 70,
+            child: pw.Image(logo, fit: pw.BoxFit.cover),
+          ),
         pw.SizedBox(width: 12),
         pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Text('SOL PERFUME',
-              style: pw.TextStyle(
-                  font: _bold, fontSize: 18, color: _gold, letterSpacing: 2)),
-          _t('عطرك، بصمتك', color: PdfColors.white, size: 10),
+          if (sid == kMainStore)
+            pw.Text('SOL PERFUME',
+                style: pw.TextStyle(
+                    font: _bold, fontSize: 18, color: _gold, letterSpacing: 2))
+          else
+            _t(brand, bold: true, size: 18, color: _gold, align: pw.TextAlign.left),
+          if (slogan.isNotEmpty) _t(slogan, color: PdfColors.white, size: 10),
         ]),
         pw.Spacer(),
         pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
@@ -234,7 +248,8 @@ Future<Uint8List> renderInvoicePdf(Map<String, dynamic> inv, Map<String, dynamic
       pw.Row(children: [
         _t('صفحة ${ctx.pageNumber} / ${ctx.pagesCount}', size: 8, color: _grey),
         pw.Spacer(),
-        _t('شكراً لتعاملكم مع SOL  -  عطرك، بصمتك', size: 9, color: _grey),
+        _t('شكراً لتعاملكم مع $brand${slogan.isEmpty ? '' : '  -  $slogan'}',
+            size: 9, color: _grey),
       ]),
     ]),
     build: (ctx) => [
@@ -315,7 +330,7 @@ Future<Uint8List> renderInvoicePdf(Map<String, dynamic> inv, Map<String, dynamic
         pw.Expanded(
           child: pw.Column(children: [
             pw.Divider(color: _black, thickness: 0.6),
-            _t('عن SOL', color: _grey, align: pw.TextAlign.center),
+            _t('عن $brand', color: _grey, align: pw.TextAlign.center),
           ]),
         ),
       ]),

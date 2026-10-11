@@ -18,7 +18,7 @@ class _InvoicesAdminState extends State<InvoicesAdmin> {
   @override
   Widget build(BuildContext context) {
     final body = StreamBuilder(
-      stream: db.collection('invoices').snapshots(),
+      stream: scoped('invoices').snapshots(),
       builder: (context, snap) {
         if (snap.hasError) return EmptyView('حصلت مشكلة: ${snap.error}');
         if (!snap.hasData) return const Loading();
@@ -118,7 +118,7 @@ class PaymentsLog extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('سجل التحصيلات')),
       body: StreamBuilder(
-        stream: db.collection('payments').snapshots(),
+        stream: scoped('payments').snapshots(),
         builder: (context, s) {
           if (!s.hasData) return const Loading();
           final docs = sortByDate(s.data!.docs);

@@ -29,9 +29,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Future<void> load() async {
     setState(() => loading = true);
     final r = await Future.wait([
-      db.collection('invoices').get(),
-      db.collection('orders').get(),
-      db.collection('products').get(),
+      scoped('invoices').get(),
+      scoped('orders').get(),
+      scoped('products').get(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -228,8 +228,8 @@ class ProductMovement extends StatelessWidget {
       appBar: AppBar(title: Text('حركة: $name')),
       body: FutureBuilder(
         future: Future.wait([
-          db.collection('invoices').get(),
-          db.collection('returns').get(),
+          scoped('invoices').get(),
+          scoped('returns').get(),
         ]),
         builder: (context, snap) {
           if (snap.hasError) return EmptyView('${snap.error}');

@@ -47,6 +47,8 @@ Future<String> createCustomerAccount({
     'password': password,
     'email': usernameToEmail(username),
     'createdByAdmin': true,
+    'storeId': profile['storeId'] ?? sid,
+    'role': profile['role'] ?? 'customer',
     'points': 0,
     'createdAt': FieldValue.serverTimestamp(),
   });
@@ -65,8 +67,8 @@ Future<void> changeCustomerPassword(
 }
 
 String credentialsText(String shop, String username, String password) =>
-    'أهلاً بيك في SOL ✨\n'
-    'دي بيانات دخولك على تطبيق SOL ($shop):\n'
+    'أهلاً بيك في $storeName ✨\n'
+    'دي بيانات دخولك على التطبيق ($shop):\n'
     'اسم المستخدم: $username\n'
     'كلمة السر: $password';
 

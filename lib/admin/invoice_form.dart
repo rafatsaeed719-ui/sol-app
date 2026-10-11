@@ -9,12 +9,17 @@ class InvoiceForm extends StatefulWidget {
   final String customerName;
   final String? orderId;
   final List<Map<String, dynamic>>? orderItems;
+  // تعديل فاتورة موجودة
+  final String? editId;
+  final Map<String, dynamic>? editData;
   const InvoiceForm({
     super.key,
     required this.customerId,
     required this.customerName,
     this.orderId,
     this.orderItems,
+    this.editId,
+    this.editData,
   });
   @override
   State<InvoiceForm> createState() => _InvoiceFormState();
@@ -33,10 +38,20 @@ class _InvoiceFormState extends State<InvoiceForm> {
   bool busy = false;
   bool loaded = false;
 
+  bool get editing => widget.editId != null;
+
   @override
   void initState() {
     super.initState();
-    for (final it in widget.orderItems ?? <Map<String, dynamic>>[]) {
+    final e = widget.editData;
+    if (e != null) {
+      note.text = (e['note'] ?? '').toString();
+      due = tsToDate(e['dueDate']);
+      days.text = '${toI(e['collectionDays'])}';
+    }
+    for (final it in (e?['items'] as List?)?.map((x) => Map<String, dynamic>.from(x)) ??
+        widget.orderItems ??
+        <Map<String, dynamic>>[]) {
       lines.add(InvLine(
         productId: it['productId'] ?? '',
         name: it['name'] ?? '',
@@ -52,17 +67,24 @@ class _InvoiceFormState extends State<InvoiceForm> {
   Future<void> _load() async {
     final s = await getSettings();
     final u = await db.collection('users').doc(widget.customerId).get();
-    final ps = await db.collection('products').get();
+    final ps = await scoped('products').get();
     if (!mounted) return;
     setState(() {
       settings = s;
       customerPoints = toI(u.data()?['points']);
-      final d = u.data()?['collectionDays'] != null
-          ? toI(u.data()?['collectionDays'])
-          : s.collectionDays;
-      days.text = '$d';
-      due = _dueFor(d);
+      if (!editing) {
+        final d = u.data()?['collectionDays'] != null
+            ? toI(u.data()?['collectionDays'])
+            : s.collectionDays;
+        days.text = '$d';
+        due = _dueFor(d);
+      }
       stocks = {for (final p in ps.docs) p.id: stockOf(p.data())};
+      // في التعديل: الكميات القديمة هترجع للمخزن الأول
+      for (final it in (widget.editData?['items'] as List? ?? [])) {
+        final pid = (it['productId'] ?? '').toString();
+        if (stocks[pid] != null) stocks[pid] = stocks[pid]! + toI(it['qty']);
+      }
       loaded = true;
     });
   }
@@ -85,11 +107,12 @@ class _InvoiceFormState extends State<InvoiceForm> {
   }
 
   double get gross => round2(lines.fold(0.0, (a, l) => a + l.lineTotal));
-  double get redeemValue => settings.valueOf(redeem);
+  double get redeemValue =>
+      editing ? toD(widget.editData?['redeemValue']) : settings.valueOf(redeem);
   double get total => round2((gross - redeemValue) < 0 ? 0 : gross - redeemValue);
 
   Future<void> addProduct() async {
-    final snap = await db.collection('products').get();
+    final snap = await scoped('products').get();
     if (!mounted) return;
     final docs = [...snap.docs]
       ..sort((a, b) => (a.data()['name'] ?? '').toString().compareTo(
@@ -173,6 +196,25 @@ class _InvoiceFormState extends State<InvoiceForm> {
       return;
     }
     setState(() => busy = true);
+    if (editing) {
+      try {
+        await updateInvoice(
+          invoiceId: widget.editId!,
+          lines: lines,
+          dueDate: due ?? DateTime.now(),
+          collectionDays: toI(days.text),
+          settings: settings,
+          note: note.text.trim(),
+        );
+        if (!mounted) return;
+        toast(context, 'اتعدلت الفاتورة ✔');
+        Navigator.pop(context);
+      } catch (e) {
+        if (mounted) toast(context, '$e', error: true);
+      }
+      if (mounted) setState(() => busy = false);
+      return;
+    }
     try {
       final (id, n) = await createInvoice(
         customerId: widget.customerId,
@@ -204,7 +246,10 @@ class _InvoiceFormState extends State<InvoiceForm> {
         ? 0
         : (customerPoints ~/ settings.pointsForReward) * settings.pointsForReward;
     return Scaffold(
-      appBar: AppBar(title: Text('فاتورة — ${widget.customerName}')),
+      appBar: AppBar(
+          title: Text(editing
+              ? 'تعديل فاتورة ${widget.editData?['number']}'
+              : 'فاتورة — ${widget.customerName}')),
       body: !loaded
           ? const Loading()
           : ListView(padding: const EdgeInsets.only(bottom: 120), children: [
@@ -292,6 +337,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
                   },
                 ),
               ),
+              if (!editing)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 child: TextField(
@@ -307,7 +353,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
                 child: TextField(
                     controller: note, decoration: const InputDecoration(labelText: 'ملاحظات')),
               ),
-              if (maxRedeem > 0) ...[
+              if (maxRedeem > 0 && !editing) ...[
                 const SectionTitle('استبدال نقاط'),
                 Card(
                   child: Padding(
@@ -358,7 +404,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
               child: FilledButton.icon(
                 onPressed: busy || !loaded ? null : save,
                 icon: const Icon(Icons.save),
-                label: const Text('حفظ الفاتورة'),
+                label: Text(editing ? 'حفظ التعديل' : 'حفظ الفاتورة'),
               ),
             ),
           ]),

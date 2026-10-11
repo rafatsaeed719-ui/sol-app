@@ -6,9 +6,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-/// إيميل المدير — أي حد يدخل بالإيميل ده يفتح له لوحة التحكم.
+/// إيميل صاحب المنصة (المدير العام) — بيدير كل المحلات، وهو كمان صاحب محل SOL.
 const String kAdminEmail = 'rafatsaeed719@gmail.com';
 const String kBrand = 'SOL';
+
+/// كود محل SOL الأساسي
+const String kMainStore = 'sol';
 
 /// الحسابات اللي المدير بيعملها باسم مستخدم بتتسجل داخلياً كـ username@sol-store.app
 const String kUserDomain = 'sol-store.app';
@@ -32,9 +35,62 @@ const Color kSuccess = Color(0xFF1E8449);
 final db = FirebaseFirestore.instance;
 final auth = FirebaseAuth.instance;
 
-bool get isAdmin =>
-    (auth.currentUser?.email ?? '').toLowerCase() == kAdminEmail.toLowerCase();
 String get uid => auth.currentUser?.uid ?? '';
+
+/// المدير العام للمنصة
+bool get isSuper =>
+    (auth.currentUser?.email ?? '').toLowerCase() == kAdminEmail.toLowerCase();
+
+/// بيانات الجلسة: المحل الحالي ودور المستخدم فيه
+class Session {
+  static String storeId = kMainStore;
+  static String role = ''; // super / owner / customer
+  static Map<String, dynamic> store = {};
+
+  /// المدير العام بيقدر يدخل على أي محل
+  static final ValueNotifier<String> superStore = ValueNotifier(kMainStore);
+
+  static void reset() {
+    storeId = kMainStore;
+    role = '';
+    store = {};
+    superStore.value = kMainStore;
+  }
+}
+
+/// مدير المحل الحالي (صاحب المحل أو المدير العام)
+bool get isAdmin => isSuper || Session.role == 'owner';
+
+/// كود المحل الحالي
+String get sid => Session.storeId;
+
+String get storeName {
+  final n = (Session.store['name'] ?? '').toString();
+  if (n.isNotEmpty) return n;
+  return sid == kMainStore ? 'SOL Perfume' : sid;
+}
+
+String get storeSlogan {
+  final n = (Session.store['slogan'] ?? '').toString();
+  if (n.isNotEmpty) return n;
+  return sid == kMainStore ? 'عطرك، بصمتك' : '';
+}
+
+/// استعلام على مجموعة متفلتر بالمحل الحالي
+Query<Map<String, dynamic>> scoped(String collection) =>
+    db.collection(collection).where('storeId', isEqualTo: sid);
+
+/// إعدادات وعدّاد كل محل
+DocumentReference<Map<String, dynamic>> storeMeta(String doc) =>
+    db.collection('stores').doc(sid).collection('meta').doc(doc);
+
+bool storeBlocked(Map<String, dynamic>? store) {
+  if (store == null) return true;
+  if (store['active'] != true) return true;
+  final end = store['subscriptionEnd'];
+  if (end is Timestamp && end.toDate().isBefore(DateTime.now())) return true;
+  return false;
+}
 
 // ---------------- helpers ----------------
 
@@ -293,4 +349,39 @@ Widget statusChip(String status) {
     child: Text(m[0] as String,
         style: TextStyle(color: c, fontSize: 12, fontWeight: FontWeight.bold)),
   );
+}
+
+
+/// لوجو المحل الحالي (أو لوجو SOL لمحل SOL)
+class StoreLogo extends StatelessWidget {
+  final double size;
+  final double radius;
+  final Map<String, dynamic>? store;
+  final String? storeId;
+  const StoreLogo({super.key, this.size = 80, this.radius = 12, this.store, this.storeId});
+
+  @override
+  Widget build(BuildContext context) {
+    final st = store ?? Session.store;
+    final id = storeId ?? sid;
+    final logo = (st['logo'] ?? '').toString();
+    Widget child;
+    if (logo.isNotEmpty) {
+      child = B64Image(logo, width: size, height: size);
+    } else if (id == kMainStore) {
+      child = Image.asset('assets/logo.png', width: size, height: size, fit: BoxFit.cover);
+    } else {
+      final n = (st['name'] ?? id).toString();
+      child = Container(
+        width: size,
+        height: size,
+        color: kPrimary,
+        alignment: Alignment.center,
+        child: Text(n.isEmpty ? '?' : n.characters.first.toUpperCase(),
+            style: TextStyle(
+                color: kAccent, fontSize: size * 0.45, fontWeight: FontWeight.bold)),
+      );
+    }
+    return ClipRRect(borderRadius: BorderRadius.circular(radius), child: child);
+  }
 }

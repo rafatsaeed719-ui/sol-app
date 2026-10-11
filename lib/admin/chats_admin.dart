@@ -12,7 +12,7 @@ class ChatsAdmin extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('المحادثات')),
       body: StreamBuilder(
-        stream: db.collection('chats').snapshots(),
+        stream: scoped('chats').snapshots(),
         builder: (context, snap) {
           if (snap.hasError) return EmptyView('${snap.error}');
           if (!snap.hasData) return const Loading();

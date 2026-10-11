@@ -19,7 +19,7 @@ class OffersAdmin extends StatelessWidget {
         label: const Text('عرض جديد'),
       ),
       body: StreamBuilder(
-        stream: db.collection('offers').snapshots(),
+        stream: scoped('offers').snapshots(),
         builder: (context, snap) {
           if (!snap.hasData) return const Loading();
           final docs = sortByDate(snap.data!.docs);
@@ -46,7 +46,7 @@ class OffersAdmin extends StatelessWidget {
                     const Spacer(),
                     TextButton.icon(
                       onPressed: () => notify('all', '🔥 ${d.data()['title']}',
-                              (d.data()['description'] ?? 'عرض جديد من SOL').toString(),
+                              (d.data()['description'] ?? 'عرض جديد من $storeName').toString(),
                               type: 'offer', refId: d.id)
                           .then((_) {
                         if (context.mounted) toast(context, 'اتبعت الإشعار لكل العملاء');
@@ -94,7 +94,7 @@ class _OfferFormState extends State<OfferForm> {
   @override
   void initState() {
     super.initState();
-    db.collection('products').get().then((s) {
+    scoped('products').get().then((s) {
       if (!mounted) return;
       setState(() {
         products = [...s.docs]
@@ -112,6 +112,7 @@ class _OfferFormState extends State<OfferForm> {
     setState(() => busy = true);
     try {
       final ref = await db.collection('offers').add({
+        'storeId': sid,
         'title': title.text.trim(),
         'description': desc.text.trim(),
         'image': image ?? '',

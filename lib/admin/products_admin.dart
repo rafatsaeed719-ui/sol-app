@@ -2,7 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app.dart';
-import 'reports_screen.dart';
+import '../core/data.dart';
+import 'warehouse_screen.dart';
 
 class ProductsAdmin extends StatefulWidget {
   const ProductsAdmin({super.key});
@@ -24,7 +25,7 @@ class _ProductsAdminState extends State<ProductsAdmin> {
         label: const Text('صنف جديد'),
       ),
       body: StreamBuilder(
-        stream: db.collection('products').snapshots(),
+        stream: scoped('products').snapshots(),
         builder: (context, snap) {
           if (snap.hasError) return EmptyView('حصلت مشكلة: ${snap.error}');
           if (!snap.hasData) return const Loading();
@@ -47,7 +48,11 @@ class _ProductsAdminState extends State<ProductsAdmin> {
                   stockOf(d.data())! *
                       netUnit(toD(d.data()['sellPrice']), toD(d.data()['discount']),
                           toD(d.data()['wholesalePrice'])));
-          final low = tracked.where((d) => stockOf(d.data())! <= 5).length;
+          final low = tracked
+              .where((d) =>
+                  stockOf(d.data())! <=
+                  (d.data()['lowStock'] == null ? 5 : toI(d.data()['lowStock'])))
+              .length;
           return Column(children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
@@ -101,15 +106,16 @@ class _ProductsAdminState extends State<ProductsAdmin> {
                                 'بيع ${money(p['sellPrice'])} • خصم ${toD(p['discount']).toStringAsFixed(1)}%\nجملة ${money(net)}${active ? '' : ' • مخفي'}'),
                             isThreeLine: true,
                             trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                              _StockBadge(stock),
+                              _StockBadge(stock,
+                                  low: p['lowStock'] == null ? 5 : toI(p['lowStock'])),
                               IconButton(
                               tooltip: 'حركة الصنف',
                               icon: const Icon(Icons.timeline, color: kPrimary),
                               onPressed: () => Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                      builder: (_) => ProductMovement(
-                                          productId: list[i].id, name: p['name'] ?? ''))),
+                                      builder: (_) => ProductMovesScreen(
+                                          productId: list[i].id, product: p))),
                               ),
                             ]),
                           ),
@@ -140,6 +146,8 @@ class _ProductFormState extends State<ProductForm> {
   final discount = TextEditingController(text: '0');
   final stock = TextEditingController();
   final addStock = TextEditingController();
+  final supplier = TextEditingController();
+  final lowStock = TextEditingController(text: '5');
   double oldWholesale = 0;
   String? image;
   bool active = true;
@@ -157,6 +165,7 @@ class _ProductFormState extends State<ProductForm> {
       oldWholesale = toD(d['wholesalePrice']);
       discount.text = _n(toD(d['discount']));
       if (d['stock'] != null) stock.text = '${toI(d['stock'])}';
+      if (d['lowStock'] != null) lowStock.text = '${toI(d['lowStock'])}';
       image = d['image'];
       active = d['active'] != false;
     }
@@ -182,23 +191,38 @@ class _ProductFormState extends State<ProductForm> {
       'wholesalePrice': netUnit(toD(sell.text), disc),
       'discount': disc,
       if (widget.id == null && stock.text.trim().isNotEmpty) 'stock': toI(stock.text),
+      'lowStock': toI(lowStock.text),
       'image': image ?? '',
       'active': active,
       'updatedAt': FieldValue.serverTimestamp(),
     };
     try {
       if (widget.id == null) {
-        await db.collection('products').add({...data, 'createdAt': FieldValue.serverTimestamp()});
+        final ref = await db.collection('products').add(
+            {...data, 'storeId': sid, 'createdAt': FieldValue.serverTimestamp()});
+        if (toI(stock.text) != 0) {
+          await db.collection('stockMoves').add({
+            'storeId': sid,
+            'productId': ref.id,
+            'productName': name.text.trim(),
+            'qty': toI(stock.text),
+            'type': 'open',
+            'party': supplier.text.trim(),
+            'note': 'رصيد أول المدة',
+            'after': toI(stock.text),
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
       } else {
         final ref = db.collection('products').doc(widget.id);
         await ref.update(data);
         final add = toI(addStock.text);
         if (add != 0) {
-          if (widget.data?['stock'] == null) {
-            await ref.update({'stock': add});
-          } else {
-            await ref.update({'stock': FieldValue.increment(add)});
-          }
+          if (widget.data?['stock'] == null) await ref.update({'stock': 0});
+          await adjustStock({widget.id!: add},
+              type: add > 0 ? 'in' : 'adjust',
+              party: supplier.text.trim(),
+              names: {widget.id!: name.text.trim()});
         }
       }
       if (mounted) Navigator.pop(context);
@@ -283,9 +307,10 @@ class _ProductFormState extends State<ProductForm> {
         ),
         const Text('📦 المخزن', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
         const SizedBox(height: 8),
-        if (widget.id == null)
-          _f(stock, 'الكمية الموجودة في المخزن', number: true)
-        else ...[
+        if (widget.id == null) ...[
+          _f(stock, 'الكمية الموجودة في المخزن', number: true),
+          _f(supplier, 'جاية من مين؟ (المورد — اختياري)'),
+        ] else ...[
           Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
@@ -303,7 +328,9 @@ class _ProductFormState extends State<ProductForm> {
                   ? 'اكتب الكمية الموجودة'
                   : 'زوّد كمية (بضاعة جديدة) — أو اكتب بالسالب للخصم',
               number: true),
+          if (toI(addStock.text) > 0) _f(supplier, 'جاية من مين؟ (المورد — اختياري)'),
         ],
+        _f(lowStock, '🔔 نبّهني لما الكمية توصل لـ', number: true),
         _f(desc, 'وصف (اختياري)', lines: 3),
         SwitchListTile(
           value: active,
@@ -337,11 +364,12 @@ class _ProductFormState extends State<ProductForm> {
 
 class _StockBadge extends StatelessWidget {
   final int? stock;
-  const _StockBadge(this.stock);
+  final int low;
+  const _StockBadge(this.stock, {this.low = 5});
   @override
   Widget build(BuildContext context) {
     if (stock == null) return const SizedBox();
-    final c = stock! <= 0 ? kDanger : (stock! <= 5 ? Colors.orange : kSuccess);
+    final c = stock! <= 0 ? kDanger : (stock! <= low ? Colors.orange : kSuccess);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(

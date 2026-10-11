@@ -88,7 +88,7 @@ class AccountScreen extends StatelessWidget {
       ),
       // ---------- الحساب والفواتير ----------
       StreamBuilder(
-        stream: db.collection('invoices').where('customerId', isEqualTo: uid).snapshots(),
+        stream: scoped('invoices').where('customerId', isEqualTo: uid).snapshots(),
         builder: (context, snap) {
           if (snap.hasError) return EmptyView('${snap.error}');
           if (!snap.hasData) return const Loading();

@@ -9,7 +9,7 @@ class OffersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
-      stream: db.collection('offers').where('active', isEqualTo: true).snapshots(),
+      stream: scoped('offers').where('active', isEqualTo: true).snapshots(),
       builder: (context, snap) {
         if (snap.hasError) return EmptyView('حصلت مشكلة: ${snap.error}');
         if (!snap.hasData) return const Loading();

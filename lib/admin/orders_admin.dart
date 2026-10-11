@@ -26,7 +26,7 @@ class OrdersAdmin extends StatelessWidget {
         ),
         Expanded(
           child: StreamBuilder(
-            stream: db.collection('orders').snapshots(),
+            stream: scoped('orders').snapshots(),
             builder: (context, snap) {
               if (snap.hasError) return EmptyView('حصلت مشكلة: ${snap.error}');
               if (!snap.hasData) return const Loading();

@@ -10,7 +10,7 @@ class MyOrdersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
-      stream: db.collection('orders').where('customerId', isEqualTo: uid).snapshots(),
+      stream: scoped('orders').where('customerId', isEqualTo: uid).snapshots(),
       builder: (context, snap) {
         if (snap.hasError) return EmptyView('حصلت مشكلة: ${snap.error}');
         if (!snap.hasData) return const Loading();

@@ -47,8 +47,7 @@ class AppSettings {
       'كل ${amountPerPoint.toStringAsFixed(0)} جنيه = نقطة، وكل $pointsForReward نقطة = ${rewardValue.toStringAsFixed(0)} جنيه خصم';
 }
 
-DocumentReference<Map<String, dynamic>> get settingsRef =>
-    db.collection('settings').doc('app');
+DocumentReference<Map<String, dynamic>> get settingsRef => storeMeta('settings');
 
 Stream<AppSettings> settingsStream() =>
     settingsRef.snapshots().map((s) => AppSettings.fromMap(s.data()));
@@ -160,10 +159,13 @@ class Cart extends ChangeNotifier {
 
 // ======================== الإشعارات ========================
 
+/// to: uid للعميل، 'admin' لمدير المحل، 'all' لكل عملاء المحل
 Future<void> notify(String to, String title, String body,
     {String type = 'general', String? refId}) {
+  final target = (to == 'admin' || to == 'all') ? '${to}_$sid' : to;
   return db.collection('notifications').add({
-    'to': to, // uid للعميل، 'admin' للمدير، 'all' للكل
+    'to': target,
+    'storeId': sid,
     'title': title,
     'body': body,
     'type': type,
@@ -178,6 +180,7 @@ Future<String> placeOrder(Map<String, dynamic> me, {String note = ''}) async {
   final c = Cart.I;
   if (c.lines.isEmpty) throw 'السلة فاضية';
   final ref = await db.collection('orders').add({
+    'storeId': sid,
     'customerId': uid,
     'customerName': me['ownerName'] ?? '',
     'shopName': me['shopName'] ?? '',
@@ -249,7 +252,7 @@ Future<(String, int)> createInvoice({
       : (redeemPoints ~/ settings.pointsForReward) * settings.pointsForReward;
   final total = round2((gross - redeemValue).clamp(0, double.infinity).toDouble());
   final earned = settings.pointsFor(total);
-  final counterRef = db.collection('settings').doc('counter');
+  final counterRef = storeMeta('counter');
   final userRef = db.collection('users').doc(customerId);
   final invRef = db.collection('invoices').doc();
 
@@ -261,6 +264,7 @@ Future<(String, int)> createInvoice({
     if (usedPoints > curPoints) throw 'العميل معهوش نقاط كفاية';
     tx.set(counterRef, {'invoice': n}, SetOptions(merge: true));
     tx.set(invRef, {
+      'storeId': sid,
       'number': n,
       'customerId': customerId,
       'customerName': customerName,
@@ -294,10 +298,13 @@ Future<(String, int)> createInvoice({
   });
 
   final used = <String, int>{};
+  final names = <String, String>{};
   for (final l in lines) {
     used[l.productId] = (used[l.productId] ?? 0) - l.qty;
+    names[l.productId] = l.name;
   }
-  await adjustStock(used);
+  await adjustStock(used,
+      type: 'sale', party: customerName, refId: invRef.id, refNumber: number, names: names);
   if (paidNow > 0) {
     await addPayment(invRef.id, paidNow, note: 'دفعة عند الاستلام');
   }
@@ -307,8 +314,26 @@ Future<(String, int)> createInvoice({
   return (invRef.id, number);
 }
 
-/// يزوّد أو يقلل المخزن (بالسالب للخصم). الأصناف اللي مخزنها مش متتبع بتتساب.
-Future<void> adjustStock(Map<String, int> changes) async {
+/// أنواع حركة المخزن
+const Map<String, String> kMoveTypes = {
+  'sale': 'بيع',
+  'return': 'مرتجع',
+  'in': 'وارد (بضاعة جديدة)',
+  'adjust': 'تسوية / جرد',
+  'invoice_delete': 'إلغاء فاتورة',
+  'invoice_edit': 'تعديل فاتورة',
+  'open': 'رصيد أول المدة',
+};
+
+/// يزوّد أو يقلل المخزن (بالسالب للخصم) ويسجّل الحركة.
+/// الأصناف اللي مخزنها مش متتبع بتتسجل حركتها بس من غير ما يتغير رصيد.
+Future<void> adjustStock(Map<String, int> changes,
+    {required String type,
+    String party = '',
+    String? refId,
+    int? refNumber,
+    String note = '',
+    Map<String, String> names = const {}}) async {
   final merged = <String, int>{};
   changes.forEach((k, v) {
     if (k.isNotEmpty && v != 0) merged[k] = (merged[k] ?? 0) + v;
@@ -317,10 +342,161 @@ Future<void> adjustStock(Map<String, int> changes) async {
     try {
       final ref = db.collection('products').doc(e.key);
       final s = await ref.get();
-      if (!s.exists || s.data()?['stock'] == null) continue;
-      await ref.update({'stock': FieldValue.increment(e.value)});
+      final p = s.data();
+      int? after;
+      if (p != null && p['stock'] != null) {
+        await ref.update({'stock': FieldValue.increment(e.value)});
+        after = toI(p['stock']) + e.value;
+      }
+      await db.collection('stockMoves').add({
+        'storeId': sid,
+        'productId': e.key,
+        'productName': (p?['name'] ?? names[e.key] ?? '').toString(),
+        'qty': e.value,
+        'type': type,
+        'party': party,
+        'refId': refId,
+        'refNumber': refNumber,
+        'note': note,
+        'after': after,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      // تنبيه إن الصنف قرب يخلص
+      if (after != null && e.value < 0) {
+        final low = p?['lowStock'] == null ? 5 : toI(p!['lowStock']);
+        if (after <= low) {
+          await notify(
+              'admin',
+              after <= 0 ? '⛔ الصنف خلص: ${p?['name']}' : '⚠️ الصنف قرب يخلص: ${p?['name']}',
+              after <= 0 ? 'المخزن فاضي من الصنف ده' : 'باقي $after بس في المخزن',
+              type: 'stock',
+              refId: e.key);
+        }
+      }
     } catch (_) {}
   }
+}
+
+/// حذف فاتورة نهائياً: يرجّع البضاعة للمخزن، ويظبط النقاط، ويمسح الدفعات والمرتجعات بتاعتها
+Future<void> deleteInvoice(String invoiceId, AppSettings settings) async {
+  final invRef = db.collection('invoices').doc(invoiceId);
+  final d = (await invRef.get()).data();
+  if (d == null) throw 'الفاتورة مش موجودة';
+  final customerId = (d['customerId'] ?? '').toString();
+  final number = toI(d['number']);
+  final items = List<Map<String, dynamic>>.from(
+      (d['items'] as List? ?? []).map((e) => Map<String, dynamic>.from(e)));
+
+  // النقاط: نشيل اللي كسبها ونرجّع اللي استبدلها
+  final returnedPts = settings.pointsFor(toD(d['returned']));
+  final delta = -toI(d['pointsEarned']) + returnedPts + toI(d['pointsRedeemed']);
+  final userRef = db.collection('users').doc(customerId);
+  await db.runTransaction((tx) async {
+    final us = await tx.get(userRef);
+    final cur = toI(us.data()?['points']);
+    final np = cur + delta;
+    if (us.exists) tx.update(userRef, {'points': np < 0 ? 0 : np});
+    tx.delete(invRef);
+    final orderId = d['orderId'];
+    if (orderId != null && orderId.toString().isNotEmpty) {
+      tx.set(db.collection('orders').doc(orderId), {
+        'status': 'accepted',
+        'invoiceId': FieldValue.delete(),
+        'invoiceNumber': FieldValue.delete(),
+      }, SetOptions(merge: true));
+    }
+  });
+
+  for (final col in ['payments', 'returns']) {
+    final q = await scoped(col).where('invoiceId', isEqualTo: invoiceId).get();
+    for (final doc in q.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  final back = <String, int>{};
+  final names = <String, String>{};
+  for (final it in items) {
+    final pid = (it['productId'] ?? '').toString();
+    back[pid] = (back[pid] ?? 0) + toI(it['qty']) - toI(it['returnedQty']);
+    names[pid] = (it['name'] ?? '').toString();
+  }
+  await adjustStock(back,
+      type: 'invoice_delete',
+      party: (d['customerName'] ?? '').toString(),
+      refNumber: number,
+      names: names);
+  await notify(customerId, 'اتلغت فاتورة رقم $number', 'الفاتورة دي اتشالت من حسابك',
+      type: 'invoice');
+}
+
+/// تعديل أصناف فاتورة موجودة (لو مفيهاش مرتجعات)
+Future<void> updateInvoice({
+  required String invoiceId,
+  required List<InvLine> lines,
+  required DateTime dueDate,
+  required int collectionDays,
+  required AppSettings settings,
+  String note = '',
+}) async {
+  if (lines.isEmpty) throw 'الفاتورة من غير أصناف';
+  final invRef = db.collection('invoices').doc(invoiceId);
+  final d = (await invRef.get()).data();
+  if (d == null) throw 'الفاتورة مش موجودة';
+  if (toD(d['returned']) > 0) throw 'الفاتورة دي عليها مرتجع — مينفعش تتعدل أصنافها';
+  final customerId = (d['customerId'] ?? '').toString();
+
+  final sellTotal = round2(lines.fold(0.0, (a, l) => a + l.sellPrice * l.qty));
+  final gross = round2(lines.fold(0.0, (a, l) => a + l.lineTotal));
+  final redeemValue = toD(d['redeemValue']);
+  final total = round2((gross - redeemValue).clamp(0, double.infinity).toDouble());
+  final earned = settings.pointsFor(total);
+  final paid = toD(d['paid']);
+
+  // فرق المخزن: القديم يرجع والجديد يتخصم
+  final diff = <String, int>{};
+  final names = <String, String>{};
+  for (final it in (d['items'] as List? ?? [])) {
+    final pid = (it['productId'] ?? '').toString();
+    diff[pid] = (diff[pid] ?? 0) + toI(it['qty']);
+    names[pid] = (it['name'] ?? '').toString();
+  }
+  for (final l in lines) {
+    diff[l.productId] = (diff[l.productId] ?? 0) - l.qty;
+    names[l.productId] = l.name;
+  }
+
+  final userRef = db.collection('users').doc(customerId);
+  await db.runTransaction((tx) async {
+    final us = await tx.get(userRef);
+    tx.update(invRef, {
+      'items': lines.map((e) => e.toMap()).toList(),
+      'sellTotal': sellTotal,
+      'wholesaleTotal': gross,
+      'discountTotal': round2(sellTotal - gross),
+      'gross': gross,
+      'total': total,
+      'balance': round2(total - paid),
+      'pointsEarned': earned,
+      'note': note,
+      'dueDate': Timestamp.fromDate(dueDate),
+      'collectionDays': collectionDays,
+      'editedAt': FieldValue.serverTimestamp(),
+    });
+    if (us.exists) {
+      final np = toI(us.data()?['points']) - toI(d['pointsEarned']) + earned;
+      tx.update(userRef, {'points': np < 0 ? 0 : np});
+    }
+  });
+  await adjustStock(diff,
+      type: 'invoice_edit',
+      party: (d['customerName'] ?? '').toString(),
+      refId: invoiceId,
+      refNumber: toI(d['number']),
+      names: names);
+  await notify(customerId, 'اتعدلت فاتورة رقم ${d['number']}',
+      'الإجمالي الجديد ${money(total)}',
+      type: 'invoice', refId: invoiceId);
 }
 
 Future<void> addPayment(String invoiceId, double amount, {String note = ''}) async {
@@ -339,6 +515,7 @@ Future<void> addPayment(String invoiceId, double amount, {String note = ''}) asy
     final balance = round2(toD(d['total']) - paid - toD(d['returned']));
     tx.update(invRef, {'paid': paid, 'balance': balance});
     tx.set(payRef, {
+      'storeId': sid,
       'invoiceId': invoiceId,
       'invoiceNumber': number,
       'customerId': customerId,
@@ -362,12 +539,15 @@ Future<double> addReturn(String invoiceId, Map<int, int> qtys,
   String customerId = '';
   int number = 0;
   final back = <String, int>{};
+  final names = <String, String>{};
+  String customerName = '';
   await db.runTransaction((tx) async {
     back.clear();
     final s = await tx.get(invRef);
     final d = s.data();
     if (d == null) throw 'الفاتورة مش موجودة';
     customerId = d['customerId'];
+    customerName = (d['customerName'] ?? '').toString();
     number = toI(d['number']);
     final userRef = db.collection('users').doc(customerId);
     final us = await tx.get(userRef);
@@ -385,6 +565,7 @@ Future<double> addReturn(String invoiceId, Map<int, int> qtys,
       amount += a;
       final pid = (it['productId'] ?? '').toString();
       back[pid] = (back[pid] ?? 0) + q;
+      names[pid] = (it['name'] ?? '').toString();
       retItems.add({
         'productId': it['productId'],
         'name': it['name'],
@@ -399,6 +580,7 @@ Future<double> addReturn(String invoiceId, Map<int, int> qtys,
     final balance = round2(toD(d['total']) - toD(d['paid']) - returned);
     tx.update(invRef, {'items': items, 'returned': returned, 'balance': balance});
     tx.set(retRef, {
+      'storeId': sid,
       'invoiceId': invoiceId,
       'invoiceNumber': number,
       'customerId': customerId,
@@ -413,7 +595,13 @@ Future<double> addReturn(String invoiceId, Map<int, int> qtys,
     tx.set(userRef, {'points': (cur - lost) < 0 ? 0 : cur - lost},
         SetOptions(merge: true));
   });
-  await adjustStock(back);
+  await adjustStock(back,
+      type: 'return',
+      party: customerName,
+      refId: invoiceId,
+      refNumber: number,
+      note: note,
+      names: names);
   await notify(customerId, 'مرتجع على فاتورة $number',
       'تم تسجيل مرتجع بقيمة ${money(amount)}',
       type: 'return', refId: invoiceId);
@@ -476,6 +664,7 @@ Future<void> sendMessage(String customerId, String text,
     'createdAt': FieldValue.serverTimestamp(),
   });
   await chatRef.set({
+    'storeId': sid,
     'customerId': customerId,
     if (customerName.isNotEmpty) 'customerName': customerName,
     'lastMessage': t,
@@ -487,7 +676,8 @@ Future<void> sendMessage(String customerId, String text,
 
 Future<void> markChatRead(String customerId) {
   return db.collection('chats').doc(customerId).set(
-      {isAdmin ? 'unreadAdmin' : 'unreadCustomer': 0}, SetOptions(merge: true));
+      {isAdmin ? 'unreadAdmin' : 'unreadCustomer': 0, 'storeId': sid},
+      SetOptions(merge: true)).catchError((_) {});
 }
 
 List<QueryDocumentSnapshot<Map<String, dynamic>>> sortByDate(

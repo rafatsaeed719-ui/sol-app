@@ -176,7 +176,7 @@ class _Profile extends StatelessWidget {
       ),
       CredentialsCard(customerId: customerId, m: m),
       StreamBuilder(
-        stream: db.collection('invoices').where('customerId', isEqualTo: customerId).snapshots(),
+        stream: scoped('invoices').where('customerId', isEqualTo: customerId).snapshots(),
         builder: (context, s) {
           final sum = summarize((s.data?.docs ??
                   <QueryDocumentSnapshot<Map<String, dynamic>>>[])
@@ -222,7 +222,7 @@ class _Invoices extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
-      stream: db.collection('invoices').where('customerId', isEqualTo: customerId).snapshots(),
+      stream: scoped('invoices').where('customerId', isEqualTo: customerId).snapshots(),
       builder: (context, s) {
         if (!s.hasData) return const Loading();
         final docs = sortByDate(s.data!.docs);
@@ -242,7 +242,7 @@ class _Orders extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
-      stream: db.collection('orders').where('customerId', isEqualTo: customerId).snapshots(),
+      stream: scoped('orders').where('customerId', isEqualTo: customerId).snapshots(),
       builder: (context, s) {
         if (!s.hasData) return const Loading();
         final docs = sortByDate(s.data!.docs);

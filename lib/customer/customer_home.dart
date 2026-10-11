@@ -10,6 +10,15 @@ import 'catalog_screen.dart';
 import 'my_orders_screen.dart';
 import 'offers_screen.dart';
 
+const String kSolWelcome =
+    'عالم من العطور الفاخرة، حيث كل رشة بتحكي عنك، وكل عطر بيسيب بصمة متتنسيش. ❤️\n\nاكتشف عطرك، وخلّي حضورك مختلف.';
+
+String get welcomeText {
+  final w = (Session.store['welcome'] ?? '').toString();
+  if (w.isNotEmpty) return w;
+  return sid == kMainStore ? kSolWelcome : 'اطلب بضاعتك بسهولة، وتابع فواتيرك ونقاطك من مكان واحد 🙏';
+}
+
 class CustomerHome extends StatefulWidget {
   const CustomerHome({super.key});
   @override
@@ -37,29 +46,23 @@ class _CustomerHomeState extends State<CustomerHome> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(22, 26, 22, 18),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.asset('assets/logo.png', width: 120, height: 120),
-              ),
+              const StoreLogo(size: 120, radius: 14),
               const SizedBox(height: 16),
-              const Text('✨ أهلاً بيك في SOL ✨',
+              Text('✨ أهلاً بيك في $storeName ✨',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                       color: kAccent, fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 14),
-              const Text(
-                  'عالم من العطور الفاخرة، حيث كل رشة بتحكي عنك، وكل عطر بيسيب بصمة متتنسيش. ❤️',
+              Text(welcomeText,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 16, height: 1.6)),
-              const SizedBox(height: 12),
-              const Text('اكتشف عطرك، وخلّي حضورك مختلف.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 15)),
-              const SizedBox(height: 16),
-              const Text('SOL — عطرك، بصمتك. 💎',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: kAccent, fontSize: 17, fontWeight: FontWeight.w600)),
+                  style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.6)),
+              if (storeSlogan.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text('$storeName — $storeSlogan 💎',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: kAccent, fontSize: 17, fontWeight: FontWeight.w600)),
+              ],
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -100,10 +103,10 @@ class _CustomerHomeState extends State<CustomerHome> {
           const titles = ['المنتجات', 'العروض', 'طلباتي', 'حسابي', 'كلّمنا'];
           return Scaffold(
             appBar: AppBar(
-              title: Text(tab == 0 ? 'SOL' : titles[tab],
+              title: Text(tab == 0 ? storeName : titles[tab],
                   style: tab == 0
                       ? const TextStyle(
-                          fontWeight: FontWeight.w900, letterSpacing: 2, color: kAccent)
+                          fontWeight: FontWeight.w900, color: kAccent)
                       : null),
               actions: [
                 const NotifBell(),

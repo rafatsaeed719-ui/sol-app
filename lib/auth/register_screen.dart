@@ -23,6 +23,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final address = TextEditingController();
   final email = TextEditingController();
   final pass = TextEditingController();
+  final storeCode = TextEditingController(text: kMainStore);
   String? photo;
   LatLng? location;
   bool busy = false;
@@ -71,6 +72,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
     setState(() => busy = true);
     try {
+      if (!editMode && !adminOnly) {
+        final code = storeCode.text.trim().toLowerCase();
+        final st = code.isEmpty ? null : await db.collection('stores').doc(code).get();
+        if (st == null || !st.exists) throw 'كود المحل غلط — اسأل المحل اللي بتتعامل معاه عن الكود';
+        if (storeBlocked(st.data())) throw 'المحل ده مش متاح دلوقتي';
+        Session.storeId = code;
+        Session.store = st.data()!;
+      }
       if (needAccount) {
         if (!email.text.contains('@') && !validUsername(email.text)) {
           throw 'اسم المستخدم بالإنجليزي أو أرقام من غير مسافات (3 حروف على الأقل)';
@@ -97,6 +106,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         } else {
           await ref.set({
             ...data,
+            'storeId': sid,
+            'role': 'customer',
             'points': 0,
             'createdAt': FieldValue.serverTimestamp(),
           });
@@ -133,6 +144,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ],
       ),
       body: ListView(padding: const EdgeInsets.all(16), children: [
+        if (!editMode && !adminOnly) ...[
+          _f(storeCode, 'كود المحل اللي بتتعامل معاه *', Icons.qr_code, ltr: true),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Text('لو بتتعامل مع SOL سيبه sol — لو محل تاني اسأله عن الكود بتاعه',
+                style: TextStyle(fontSize: 12, color: Colors.black54)),
+          ),
+        ],
         if (!adminOnly) ...[
           Center(
             child: GestureDetector(

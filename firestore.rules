@@ -2,79 +2,146 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ===== مين اللي داخل =====
     function signedIn() { return request.auth != null; }
-    function isAdmin() {
+    // المدير العام (صاحب المنصة)
+    function isSuper() {
       return signedIn() && request.auth.token.email == 'rafatsaeed719@gmail.com';
     }
     function isMe(id) { return signedIn() && request.auth.uid == id; }
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function myStore() { return me().storeId; }
+    function storeActive(s) {
+      return get(/databases/$(database)/documents/stores/$(s)).data.active == true;
+    }
+    // صاحب المحل ده واشتراكه شغال
+    function canManage(s) {
+      return signedIn() && me().role == 'owner' && me().storeId == s && storeActive(s);
+    }
+    // أي حد تبع المحل ده (صاحبه أو عميل)
+    function memberOf(s) { return signedIn() && me().storeId == s; }
     function ownsDoc() { return isMe(resource.data.customerId); }
 
-    // بيانات المحلات
-    match /users/{userId} {
-      allow read: if isMe(userId) || isAdmin();
-      allow create: if isAdmin() || (isMe(userId) && request.resource.data.points == 0);
-      // العميل يعدّل بياناته بس من غير ما يلمس النقاط
-      allow update: if isAdmin() || (isMe(userId) &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['points', 'username', 'password', 'createdByAdmin', 'collectionDays']));
-      allow delete: if isAdmin();
-    }
-
-    // الأصناف والعروض والإعدادات: الكل يقرأ والمدير بس يكتب
-    match /products/{id} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
-    }
-    match /offers/{id} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
-    }
-    match /settings/{id} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
-    }
-
-    // الطلبات
-    match /orders/{id} {
-      allow read: if isAdmin() || ownsDoc();
-      allow create: if isMe(request.resource.data.customerId) &&
-        request.resource.data.status == 'new';
-      // العميل يقدر يلغي طلبه وهو لسه جديد بس
-      allow update: if isAdmin() || (ownsDoc() && resource.data.status == 'new' &&
-        request.resource.data.status == 'cancelled' &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
-      allow delete: if isAdmin();
-    }
-
-    // الفواتير والتحصيل والمرتجعات: المدير بس يكتب، العميل يقرأ بتاعه
-    match /invoices/{id} {
-      allow read: if isAdmin() || ownsDoc();
-      allow write: if isAdmin();
-    }
-    match /payments/{id} {
-      allow read: if isAdmin() || ownsDoc();
-      allow write: if isAdmin();
-    }
-    match /returns/{id} {
-      allow read: if isAdmin() || ownsDoc();
-      allow write: if isAdmin();
-    }
-
-    // الشات
-    match /chats/{customerId} {
-      allow read, write: if isAdmin() || isMe(customerId);
-      match /messages/{msg} {
-        allow read: if isAdmin() || isMe(customerId);
-        allow create: if isAdmin() ||
-          (isMe(customerId) && request.resource.data.from == customerId);
+    // ===== المحلات =====
+    match /stores/{s} {
+      allow read: if true; // الاسم واللوجو بيظهروا قبل تسجيل الدخول
+      allow create, delete: if isSuper();
+      allow update: if isSuper() || (canManage(s) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['name', 'logo', 'slogan', 'welcome', 'phone', 'address']));
+      // إعدادات وعدّاد فواتير كل محل
+      match /meta/{doc} {
+        allow read: if isSuper() || memberOf(s);
+        allow write: if isSuper() || canManage(s);
       }
     }
 
-    // الإشعارات
+    // ===== المستخدمين (أصحاب المحلات والعملاء) =====
+    match /users/{userId} {
+      allow read: if isMe(userId) || isSuper() || canManage(resource.data.storeId);
+      allow create: if isSuper()
+        || (canManage(request.resource.data.storeId) && request.resource.data.role == 'customer')
+        || (isMe(userId) && request.resource.data.role == 'customer'
+            && request.resource.data.points == 0
+            && storeActive(request.resource.data.storeId));
+      allow update: if isSuper()
+        || (canManage(resource.data.storeId)
+            && request.resource.data.storeId == resource.data.storeId
+            && request.resource.data.role == resource.data.role)
+        || (isMe(userId) && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['points', 'username', 'password', 'createdByAdmin',
+                     'collectionDays', 'role', 'storeId']));
+      allow delete: if isSuper()
+        || (canManage(resource.data.storeId) && resource.data.role == 'customer');
+    }
+
+    // ===== الأصناف والعروض: عملاء المحل يقروا وصاحبه يكتب =====
+    match /products/{id} {
+      allow read: if isSuper() || memberOf(resource.data.storeId);
+      allow create: if isSuper() || canManage(request.resource.data.storeId);
+      allow update: if isSuper() || (canManage(resource.data.storeId)
+        && request.resource.data.storeId == resource.data.storeId);
+      allow delete: if isSuper() || canManage(resource.data.storeId);
+    }
+    match /offers/{id} {
+      allow read: if isSuper() || memberOf(resource.data.storeId);
+      allow create: if isSuper() || canManage(request.resource.data.storeId);
+      allow update: if isSuper() || (canManage(resource.data.storeId)
+        && request.resource.data.storeId == resource.data.storeId);
+      allow delete: if isSuper() || canManage(resource.data.storeId);
+    }
+
+    // ===== الطلبات =====
+    match /orders/{id} {
+      allow read: if isSuper() || ownsDoc() || canManage(resource.data.storeId);
+      allow create: if isMe(request.resource.data.customerId)
+        && request.resource.data.status == 'new'
+        && request.resource.data.storeId == myStore();
+      allow update: if isSuper() || canManage(resource.data.storeId)
+        || (ownsDoc() && resource.data.status == 'new'
+            && request.resource.data.status == 'cancelled'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
+      allow delete: if isSuper() || canManage(resource.data.storeId);
+    }
+
+    // ===== الفواتير والتحصيل والمرتجعات =====
+    match /invoices/{id} {
+      allow read: if isSuper() || ownsDoc() || canManage(resource.data.storeId);
+      allow create: if isSuper() || canManage(request.resource.data.storeId);
+      allow update, delete: if isSuper() || canManage(resource.data.storeId);
+    }
+    match /payments/{id} {
+      allow read: if isSuper() || ownsDoc() || canManage(resource.data.storeId);
+      allow create: if isSuper() || canManage(request.resource.data.storeId);
+      allow update, delete: if isSuper() || canManage(resource.data.storeId);
+    }
+    match /returns/{id} {
+      allow read: if isSuper() || ownsDoc() || canManage(resource.data.storeId);
+      allow create: if isSuper() || canManage(request.resource.data.storeId);
+      allow update, delete: if isSuper() || canManage(resource.data.storeId);
+    }
+
+    // ===== المصروفات وحركة المخزن: صاحب المحل بس =====
+    match /expenses/{id} {
+      allow read, update, delete: if isSuper() || canManage(resource.data.storeId);
+      allow create: if isSuper() || canManage(request.resource.data.storeId);
+    }
+    match /stockMoves/{id} {
+      allow read, update, delete: if isSuper() || canManage(resource.data.storeId);
+      allow create: if isSuper() || canManage(request.resource.data.storeId);
+    }
+
+    // ===== الشات =====
+    function chatStore(customerId) {
+      return get(/databases/$(database)/documents/users/$(customerId)).data.storeId;
+    }
+    match /chats/{customerId} {
+      allow read: if isSuper() || isMe(customerId) || canManage(resource.data.storeId);
+      allow create, update: if isSuper() || isMe(customerId)
+        || canManage(request.resource.data.storeId);
+      match /messages/{msg} {
+        allow read: if isSuper() || isMe(customerId) || canManage(chatStore(customerId));
+        allow create: if isSuper() || canManage(chatStore(customerId))
+          || (isMe(customerId) && request.resource.data.from == customerId);
+      }
+    }
+
+    // إعدادات النسخة القديمة (قبل نظام المحلات)
+    match /settings/{id} {
+      allow read, write: if isSuper();
+    }
+
+    // ===== الإشعارات =====
     match /notifications/{id} {
-      allow read: if isAdmin() ||
-        (signedIn() && resource.data.to in [request.auth.uid, 'all']);
-      allow create: if isAdmin() || (signedIn() && request.resource.data.to == 'admin');
-      allow delete: if isAdmin();
+      allow read: if isSuper()
+        || (signedIn() && resource.data.to in [request.auth.uid, 'all_' + myStore()])
+        || (resource.data.to == 'admin_' + myStore() && canManage(myStore()));
+      allow create: if isSuper()
+        || (signedIn() && request.resource.data.to == 'admin_' + myStore())
+        || canManage(request.resource.data.storeId);
+      allow delete: if isSuper() || canManage(resource.data.storeId);
     }
   }
 }
