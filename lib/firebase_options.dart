@@ -12,8 +12,8 @@ const FirebaseOptions _android = FirebaseOptions(
 
 // نسخة الويب (WEB_API_KEY / WEB_APP_ID بتتملى من إعدادات Firebase للويب)
 const FirebaseOptions _web = FirebaseOptions(
-  apiKey: 'WEB_API_KEY',
-  appId: 'WEB_APP_ID',
+  apiKey: 'AIzaSyAbDw61QcfrU-2wc6SdAiXUSp1BNOnl3m8',
+  appId: '1:436099253442:web:6f00121c9e6c7fd111e75b',
   messagingSenderId: '436099253442',
   projectId: 'sol-app-9ebbe',
   authDomain: 'sol-app-9ebbe.firebaseapp.com',
