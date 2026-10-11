@@ -175,10 +175,10 @@ Future<Uint8List> renderInvoicePdf(Map<String, dynamic> inv, Map<String, dynamic
 
   final totals = <pw.Widget>[
     infoRow('إجمالي سعر البيع', _m(inv['sellTotal'])),
-    infoRow('إجمالي الخصم', '- ${_m(inv['discountTotal'])}', color: _green),
+    infoRow('إجمالي الخصم', _m(inv['discountTotal']), color: _green),
     infoRow('إجمالي سعر الجملة', _m(inv['gross'] ?? inv['wholesaleTotal'])),
     if (toI(inv['pointsRedeemed']) > 0)
-      infoRow('خصم نقاط (${inv['pointsRedeemed']} نقطة)', '- ${_m(inv['redeemValue'])}',
+      infoRow('خصم نقاط (${inv['pointsRedeemed']} نقطة)', _m(inv['redeemValue']),
           color: _green),
     pw.Container(
       margin: const pw.EdgeInsets.symmetric(vertical: 4),
@@ -192,7 +192,7 @@ Future<Uint8List> renderInvoicePdf(Map<String, dynamic> inv, Map<String, dynamic
       ]),
     ),
     infoRow('المدفوع', _m(inv['paid']), color: _green),
-    if (toD(inv['returned']) > 0) infoRow('المرتجعات', '- ${_m(inv['returned'])}', color: _red),
+    if (toD(inv['returned']) > 0) infoRow('المرتجعات', _m(inv['returned']), color: _red),
     pw.Divider(color: _line, height: 6),
     infoRow(bal < -0.009 ? 'رصيد لصالح العميل' : 'المتبقي على العميل', _m(bal.abs()),
         bold: true, color: bal > 0.009 ? _red : _green),
@@ -269,13 +269,11 @@ Future<Uint8List> renderInvoicePdf(Map<String, dynamic> inv, Map<String, dynamic
         },
         children: rows,
       ),
-      pw.Padding(
+      pw.Container(
+        alignment: pw.Alignment.centerRight,
         padding: const pw.EdgeInsets.only(top: 4),
-        child: pw.Row(children: [
-          pw.Spacer(),
-          _t('عدد الأصناف: ${items.length}   -   إجمالي القطع: $totalQty',
-              size: 9, color: _grey),
-        ]),
+        child: _t('عدد الأصناف: ${items.length}   -   إجمالي القطع: $totalQty',
+            size: 9, color: _grey),
       ),
       pw.SizedBox(height: 12),
       pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
