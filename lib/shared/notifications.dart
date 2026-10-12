@@ -9,6 +9,7 @@ import '../core/data.dart';
 
 Query<Map<String, dynamic>> myNotificationsQuery() {
   final c = db.collection('notifications');
+  if (isSuper) return c.where('to', whereIn: ['admin_$sid', 'super']);
   if (isAdmin) return c.where('to', isEqualTo: 'admin_$sid');
   return c.where('to', whereIn: [uid, 'all_$sid']);
 }

@@ -8,6 +8,7 @@ import 'auth/login_screen.dart';
 import 'auth/register_screen.dart';
 import 'core/app.dart';
 import 'core/migration.dart';
+import 'core/platform.dart';
 import 'customer/customer_home.dart';
 import 'firebase_options.dart';
 
@@ -91,6 +92,7 @@ class AuthGate extends StatelessWidget {
             if (!us.hasData) return const Scaffold(body: Loading());
             final me = us.data!.data();
             if (me == null) return const RegisterScreen(completeProfileOnly: true);
+            if (me['disabled'] == true) return const _DisabledScreen();
             final storeId = (me['storeId'] ?? kMainStore).toString();
             final role = (me['role'] ?? 'customer').toString();
             return _StoreGate(storeId: storeId, role: role);
@@ -182,12 +184,82 @@ class _BlockedScreen extends StatelessWidget {
               const SizedBox(height: 12),
               const Icon(Icons.lock_clock, size: 48, color: kDanger),
               const SizedBox(height: 8),
-              Text(
-                  Session.role == 'owner'
-                      ? 'اشتراك المحل متوقف — كلّم إدارة SOL لتجديد الاشتراك'
-                      : 'المحل ده مش متاح دلوقتي',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16)),
+              if (store['status'] == 'pending' && Session.role == 'owner')
+                _PendingInfo(store: store)
+              else
+                Text(
+                    Session.role == 'owner'
+                        ? (store['status'] == 'rejected'
+                            ? 'طلب الاشتراك اترفض — كلّم إدارة SOL'
+                            : 'اشتراك المحل خلص أو متوقف — كلّم إدارة SOL لتجديد الاشتراك')
+                        : 'المحل ده مش متاح دلوقتي',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 16)),
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: () => auth.signOut(),
+                icon: const Icon(Icons.logout),
+                label: const Text('تسجيل خروج'),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PendingInfo extends StatelessWidget {
+  final Map<String, dynamic> store;
+  const _PendingInfo({required this.store});
+  @override
+  Widget build(BuildContext context) {
+    final plan = store['requestedPlan'] is Map ? Plan.fromMap(store['requestedPlan']) : null;
+    return StreamBuilder<PlatformConfig>(
+      stream: platformStream(),
+      builder: (context, snap) {
+        final pay = snap.data?.paymentInfo ?? '';
+        return Column(children: [
+          const Text('طلبك وصل ✔ ومستني التفعيل',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kSuccess)),
+          const SizedBox(height: 10),
+          if (plan != null)
+            Text('الباقة: ${plan.name} (${plan.period}) — ${money(plan.price)}',
+                textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
+          if (pay.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFFFF6E6), borderRadius: BorderRadius.circular(10)),
+              child: Text('طريقة الدفع:\n$pay',
+                  textAlign: TextAlign.center, style: const TextStyle(height: 1.5)),
+            ),
+          ],
+          const SizedBox(height: 10),
+          const Text('أول ما إدارة SOL تأكد الدفع، هتقدر تدخل وتبدأ على طول.',
+              textAlign: TextAlign.center, style: TextStyle(color: Colors.black54)),
+        ]);
+      },
+    );
+  }
+}
+
+class _DisabledScreen extends StatelessWidget {
+  const _DisabledScreen();
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.block, size: 56, color: kDanger),
+              const SizedBox(height: 12),
+              const Text('الحساب ده متوقف', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('كلّم المحل اللي بتتعامل معاه', textAlign: TextAlign.center),
               const SizedBox(height: 24),
               OutlinedButton.icon(
                 onPressed: () => auth.signOut(),

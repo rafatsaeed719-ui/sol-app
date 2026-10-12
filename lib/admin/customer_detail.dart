@@ -175,6 +175,20 @@ class _Profile extends StatelessWidget {
         ]),
       ),
       CredentialsCard(customerId: customerId, m: m),
+      Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: SwitchListTile(
+          value: m['disabled'] != true,
+          activeColor: kSuccess,
+          title: Text(m['disabled'] == true ? 'الحساب موقوف' : 'الحساب شغال',
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: m['disabled'] == true ? kDanger : kSuccess)),
+          subtitle: const Text('لو وقفته مش هيقدر يدخل التطبيق'),
+          onChanged: (v) =>
+              db.collection('users').doc(customerId).update({'disabled': !v}),
+        ),
+      ),
       StreamBuilder(
         stream: scoped('invoices').where('customerId', isEqualTo: customerId).snapshots(),
         builder: (context, s) {

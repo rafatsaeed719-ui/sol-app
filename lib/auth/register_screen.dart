@@ -99,6 +99,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'email': auth.currentUser?.email ?? '',
           if (needAccount && !email.text.contains('@'))
             'username': email.text.trim().toLowerCase(),
+          if (needAccount) 'password': pass.text,
         };
         final ref = db.collection('users').doc(uid);
         if (editMode) {

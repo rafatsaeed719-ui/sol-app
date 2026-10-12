@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app.dart';
 import 'register_screen.dart';
+import 'store_signup.dart';
 
 String authError(Object e) {
   if (e is FirebaseAuthException) {
@@ -130,7 +131,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const RegisterScreen())),
                 icon: const Icon(Icons.storefront),
-                label: const Text('محل جديد؟ سجّل حسابك'),
+                label: const Text('عميل جديد؟ سجّل حسابك'),
+              ),
+              const SizedBox(height: 10),
+              TextButton.icon(
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const StoreSignupScreen())),
+                icon: const Icon(Icons.workspace_premium, color: kAccent),
+                label: const Text('عندك محل؟ اشترك في البرنامج وشغّله باسمك'),
               ),
             ]),
           ),

@@ -55,15 +55,26 @@ Future<String> createCustomerAccount({
   return newUid;
 }
 
-/// تغيير كلمة سر عميل (لازم تكون كلمة السر القديمة متسجلة عندنا)
-Future<void> changeCustomerPassword(
-    String customerId, String username, String oldPass, String newPass) async {
+/// تغيير كلمة سر أي حساب (لازم تكون كلمة السر الحالية متسجلة عندنا)
+Future<void> changeUserPassword(
+    String userId, String loginEmail, String oldPass, String newPass) async {
   final helper = await _helperAuth();
-  final cred = await helper.signInWithEmailAndPassword(
-      email: usernameToEmail(username), password: oldPass);
+  final cred = await helper.signInWithEmailAndPassword(email: loginEmail, password: oldPass);
   await cred.user!.updatePassword(newPass);
   await helper.signOut();
-  await db.collection('users').doc(customerId).update({'password': newPass});
+  await db.collection('users').doc(userId).update({'password': newPass});
+}
+
+Future<void> changeCustomerPassword(
+        String customerId, String username, String oldPass, String newPass) =>
+    changeUserPassword(customerId, usernameToEmail(username), oldPass, newPass);
+
+/// الإيميل اللي الحساب بيدخل بيه
+String loginEmailOf(Map<String, dynamic> m) {
+  final e = (m['email'] ?? '').toString();
+  if (e.isNotEmpty) return e;
+  final u = (m['username'] ?? '').toString();
+  return u.isEmpty ? '' : usernameToEmail(u);
 }
 
 String credentialsText(String shop, String username, String password) =>

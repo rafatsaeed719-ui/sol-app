@@ -162,12 +162,22 @@ class _MoreMenu extends StatelessWidget {
           child: ListTile(
             leading: const CircleAvatar(
                 backgroundColor: kAccent, child: Icon(Icons.store_mall_directory, color: kPrimary)),
-            title: const Text('إدارة المحلات',
+            title: const Text('إدارة البرنامج',
                 style: TextStyle(fontWeight: FontWeight.bold, color: kAccent)),
             subtitle: Text(
-                sid == kMainStore ? 'المحلات المشتركة والاشتراكات' : 'إنت دلوقتي داخل على: $storeName',
+                sid == kMainStore
+                    ? 'المحلات، المستخدمين، الباقات والأسعار، الاشتراكات'
+                    : 'إنت دلوقتي داخل على: $storeName',
                 style: const TextStyle(color: Colors.white70)),
-            trailing: const Icon(Icons.chevron_left, color: kAccent),
+            trailing: StreamBuilder(
+              stream: db.collection('stores').where('status', isEqualTo: 'pending').snapshots(),
+              builder: (context, ps) {
+                final n = ps.data?.docs.length ?? 0;
+                return n > 0
+                    ? Badge(label: Text('$n طلب'), backgroundColor: kAccent, textColor: kPrimary)
+                    : const Icon(Icons.chevron_left, color: kAccent);
+              },
+            ),
             onTap: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => const StoresAdmin())),
           ),

@@ -19,17 +19,24 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/stores/$(s)).data.active == true;
     }
     // صاحب المحل ده واشتراكه شغال
+    function notDisabled() { return me().get('disabled', false) != true; }
     function canManage(s) {
-      return signedIn() && myRole() == 'owner' && myStore() == s && storeActive(s);
+      return signedIn() && myRole() == 'owner' && myStore() == s && notDisabled()
+        && storeActive(s);
     }
     // أي حد تبع المحل ده (صاحبه أو عميل)
-    function memberOf(s) { return signedIn() && myStore() == s; }
+    function memberOf(s) { return signedIn() && myStore() == s && notDisabled(); }
     function ownsDoc() { return isMe(resource.data.customerId); }
 
     // ===== المحلات =====
     match /stores/{s} {
       allow read: if true; // الاسم واللوجو بيظهروا قبل تسجيل الدخول
-      allow create, delete: if isSuper();
+      allow delete: if isSuper();
+      // محل جديد بيطلب اشتراك: بيتعمل متوقف لحد ما المدير العام يفعّله
+      allow create: if isSuper() || (signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.active == false
+        && request.resource.data.status == 'pending');
       allow update: if isSuper() || (canManage(s) &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['name', 'logo', 'slogan', 'welcome', 'phone', 'address']));
@@ -47,14 +54,17 @@ service cloud.firestore {
         || (canManage(request.resource.data.storeId) && request.resource.data.role == 'customer')
         || (isMe(userId) && request.resource.data.role == 'customer'
             && request.resource.data.points == 0
-            && storeActive(request.resource.data.storeId));
+            && storeActive(request.resource.data.storeId))
+        || (isMe(userId) && request.resource.data.role == 'owner'
+            && get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerUid == request.auth.uid
+            && get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.status == 'pending');
       allow update: if isSuper()
         || (canManage(resource.data.storeId)
             && request.resource.data.storeId == resource.data.storeId
             && request.resource.data.role == resource.data.role)
         || (isMe(userId) && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['points', 'username', 'password', 'createdByAdmin',
-                     'collectionDays', 'role', 'storeId']));
+                     'collectionDays', 'role', 'storeId', 'disabled']));
       allow delete: if isSuper()
         || (canManage(resource.data.storeId) && resource.data.role == 'customer');
     }
@@ -135,12 +145,23 @@ service cloud.firestore {
       allow read, write: if isSuper();
     }
 
+    // باقات وأسعار الاشتراك في البرنامج: الكل يشوفها والمدير العام بس يعدّلها
+    match /platform/{doc} {
+      allow read: if true;
+      allow write: if isSuper();
+    }
+    // سجل اشتراكات المحلات المدفوعة
+    match /subscriptions/{id} {
+      allow read, write: if isSuper();
+    }
+
     // ===== الإشعارات =====
     match /notifications/{id} {
       allow read: if isSuper()
         || (signedIn() && resource.data.to in [request.auth.uid, 'all_' + myStore()])
         || (resource.data.to == 'admin_' + myStore() && canManage(myStore()));
       allow create: if isSuper()
+        || (signedIn() && request.resource.data.to == 'super')
         || (signedIn() && request.resource.data.to == 'admin_' + myStore())
         || canManage(request.resource.data.storeId);
       allow update, delete: if isSuper() || canManage(resource.data.storeId);
