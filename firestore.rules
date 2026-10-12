@@ -117,7 +117,7 @@ service cloud.firestore {
 
     // ===== الشات =====
     function chatStore(customerId) {
-      return get(/databases/$(database)/documents/users/$(customerId)).data.storeId;
+      return get(/databases/$(database)/documents/users/$(customerId)).data.get('storeId', 'sol');
     }
     match /chats/{customerId} {
       allow read: if isSuper() || isMe(customerId) || canManage(resource.data.storeId);
