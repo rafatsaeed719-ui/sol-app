@@ -12,16 +12,18 @@ service cloud.firestore {
     function me() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
-    function myStore() { return me().storeId; }
+    // العملاء القدام اللي لسه بياناتهم ماتنقلتش بيتحسبوا على محل SOL
+    function myStore() { return me().get('storeId', 'sol'); }
+    function myRole() { return me().get('role', 'customer'); }
     function storeActive(s) {
       return get(/databases/$(database)/documents/stores/$(s)).data.active == true;
     }
     // صاحب المحل ده واشتراكه شغال
     function canManage(s) {
-      return signedIn() && me().role == 'owner' && me().storeId == s && storeActive(s);
+      return signedIn() && myRole() == 'owner' && myStore() == s && storeActive(s);
     }
     // أي حد تبع المحل ده (صاحبه أو عميل)
-    function memberOf(s) { return signedIn() && me().storeId == s; }
+    function memberOf(s) { return signedIn() && myStore() == s; }
     function ownsDoc() { return isMe(resource.data.customerId); }
 
     // ===== المحلات =====
