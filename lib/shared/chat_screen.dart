@@ -131,12 +131,14 @@ class _ChatViewState extends State<ChatView> {
 class ChatScreen extends StatelessWidget {
   final String customerId;
   final String title;
-  const ChatScreen({super.key, required this.customerId, required this.title});
+  final String? customerName;
+  const ChatScreen(
+      {super.key, required this.customerId, required this.title, this.customerName});
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
-      body: ChatView(customerId: customerId, customerName: title),
+      body: ChatView(customerId: customerId, customerName: customerName ?? title),
     );
   }
 }

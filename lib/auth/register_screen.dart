@@ -11,7 +11,9 @@ import 'login_screen.dart';
 class RegisterScreen extends StatefulWidget {
   final bool completeProfileOnly;
   final Map<String, dynamic>? existing; // وضع التعديل
-  const RegisterScreen({super.key, this.completeProfileOnly = false, this.existing});
+  final String? editUserId; // المدير بيعدّل بيانات عميل
+  const RegisterScreen(
+      {super.key, this.completeProfileOnly = false, this.existing, this.editUserId});
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
@@ -57,11 +59,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> submit() async {
     final adminOnly = needAccount && adminEmailTyped;
     if (!adminOnly) {
-      if (shop.text.trim().isEmpty || owner.text.trim().isEmpty || phone.text.trim().isEmpty) {
+      if (editMode && shop.text.trim().isEmpty && owner.text.trim().isEmpty) {
+        toast(context, 'اكتب الاسم', error: true);
+        return;
+      }
+      if (!editMode &&
+          (shop.text.trim().isEmpty || owner.text.trim().isEmpty || phone.text.trim().isEmpty)) {
         toast(context, 'اكتب اسم المحل واسم صاحبه ورقم الموبايل', error: true);
         return;
       }
-      if (location == null) {
+      if (location == null && !editMode) {
         toast(context, 'حدد مكان المحل على الخريطة', error: true);
         return;
       }
@@ -87,21 +94,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
         await auth.createUserWithEmailAndPassword(
             email: loginToEmail(email.text), password: pass.text);
       }
-      if (!isAdmin) {
+      if (!isAdmin || editMode) {
         final data = <String, dynamic>{
           'shopName': shop.text.trim(),
           'ownerName': owner.text.trim(),
           'phone': phone.text.trim(),
           'address': address.text.trim(),
           'photo': photo ?? '',
-          'lat': location!.latitude,
-          'lng': location!.longitude,
-          'email': auth.currentUser?.email ?? '',
+          if (location != null) 'lat': location!.latitude,
+          if (location != null) 'lng': location!.longitude,
+          if (!editMode) 'email': auth.currentUser?.email ?? '',
           if (needAccount && !email.text.contains('@'))
             'username': email.text.trim().toLowerCase(),
           if (needAccount) 'password': pass.text,
         };
-        final ref = db.collection('users').doc(uid);
+        final ref = db.collection('users').doc(widget.editUserId ?? uid);
         if (editMode) {
           await ref.update(data);
         } else {
@@ -135,7 +142,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final adminOnly = needAccount && adminEmailTyped;
     return Scaffold(
       appBar: AppBar(
-        title: Text(editMode ? 'تعديل بيانات المحل' : 'تسجيل محل جديد'),
+        title: Text(editMode ? 'تعديل البيانات' : 'تسجيل محل جديد'),
         actions: [
           if (widget.completeProfileOnly)
             IconButton(

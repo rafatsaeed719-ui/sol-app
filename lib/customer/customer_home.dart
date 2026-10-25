@@ -7,6 +7,7 @@ import '../shared/notifications.dart';
 import 'account_screen.dart';
 import 'cart_screen.dart';
 import 'catalog_screen.dart';
+import 'home_tab.dart';
 import 'my_orders_screen.dart';
 import 'offers_screen.dart';
 
@@ -93,14 +94,21 @@ class _CustomerHomeState extends State<CustomerHome> {
         builder: (context, snap) {
           final me = snap.data?.data() ?? <String, dynamic>{};
           _maybeWelcome(me);
+          void openChat() => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => ChatScreen(
+                      customerId: uid,
+                      title: 'كلّم $storeName',
+                      customerName: (me['shopName'] ?? '').toString())));
           final pages = [
+            HomeTab(onGo: (i) => setState(() => tab = i), onChat: openChat),
             const CatalogScreen(),
             const OffersScreen(),
             const MyOrdersScreen(),
             AccountScreen(me: me),
-            ChatView(customerId: uid, customerName: me['shopName'] ?? ''),
           ];
-          const titles = ['المنتجات', 'العروض', 'طلباتي', 'حسابي', 'كلّمنا'];
+          const titles = ['الرئيسية', 'المنتجات', 'العروض', 'طلباتي', 'حسابي'];
           return Scaffold(
             appBar: AppBar(
               title: Text(tab == 0 ? storeName : titles[tab],
@@ -109,6 +117,8 @@ class _CustomerHomeState extends State<CustomerHome> {
                           fontWeight: FontWeight.w900, color: kAccent)
                       : null),
               actions: [
+                IconButton(
+                    tooltip: 'كلّمنا', onPressed: openChat, icon: const Icon(Icons.chat_bubble_outline)),
                 const NotifBell(),
                 ListenableBuilder(
                   listenable: Cart.I,
@@ -126,7 +136,7 @@ class _CustomerHomeState extends State<CustomerHome> {
               ],
             ),
             body: IndexedStack(index: tab, children: pages),
-            floatingActionButton: tab <= 1
+            floatingActionButton: tab <= 2
                 ? ListenableBuilder(
                     listenable: Cart.I,
                     builder: (c, _) => Cart.I.count == 0
@@ -143,11 +153,11 @@ class _CustomerHomeState extends State<CustomerHome> {
               selectedIndex: tab,
               onDestinationSelected: (i) => setState(() => tab = i),
               destinations: const [
+                NavigationDestination(icon: Icon(Icons.home_outlined), label: 'الرئيسية'),
                 NavigationDestination(icon: Icon(Icons.storefront_outlined), label: 'المنتجات'),
                 NavigationDestination(icon: Icon(Icons.local_offer_outlined), label: 'العروض'),
                 NavigationDestination(icon: Icon(Icons.receipt_outlined), label: 'طلباتي'),
                 NavigationDestination(icon: Icon(Icons.person_outline), label: 'حسابي'),
-                NavigationDestination(icon: Icon(Icons.chat_bubble_outline), label: 'كلّمنا'),
               ],
             ),
           );

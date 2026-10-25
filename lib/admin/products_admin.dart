@@ -151,6 +151,7 @@ class _ProductFormState extends State<ProductForm> {
   double oldWholesale = 0;
   String? image;
   bool active = true;
+  bool featured = false;
   bool busy = false;
 
   @override
@@ -168,6 +169,7 @@ class _ProductFormState extends State<ProductForm> {
       if (d['lowStock'] != null) lowStock.text = '${toI(d['lowStock'])}';
       image = d['image'];
       active = d['active'] != false;
+      featured = d['featured'] == true;
     }
     for (final c in [sell, discount, addStock]) {
       c.addListener(() => setState(() {}));
@@ -194,6 +196,7 @@ class _ProductFormState extends State<ProductForm> {
       'lowStock': toI(lowStock.text),
       'image': image ?? '',
       'active': active,
+      'featured': featured,
       'updatedAt': FieldValue.serverTimestamp(),
     };
     try {
@@ -337,6 +340,12 @@ class _ProductFormState extends State<ProductForm> {
           onChanged: (v) => setState(() => active = v),
           title: const Text('ظاهر للعملاء'),
           subtitle: const Text('اقفله لو الصنف خلصان مؤقتاً'),
+        ),
+        SwitchListTile(
+          value: featured,
+          onChanged: (v) => setState(() => featured = v),
+          title: const Text('⭐ صنف مميز'),
+          subtitle: const Text('يظهر في "المختارات" على الصفحة الرئيسية للعملاء'),
         ),
         const SizedBox(height: 10),
         SizedBox(

@@ -5,6 +5,7 @@ import '../core/app.dart';
 import '../core/data.dart';
 import 'customer_accounts.dart';
 import 'customer_detail.dart';
+import 'visits.dart';
 
 class CustomersAdmin extends StatefulWidget {
   const CustomersAdmin({super.key});
@@ -62,6 +63,10 @@ class _CustomersAdminState extends State<CustomersAdmin> {
                     .toString()
                     .compareTo((b.data()['shopName'] ?? '').toString());
               }
+              if (sort == 'visit') {
+                return (daysSinceVisit(b.data()) ?? 99999)
+                    .compareTo(daysSinceVisit(a.data()) ?? 99999);
+              }
               if (sort == 'sales') {
                 return (sums[b.id]?.total ?? 0).compareTo(sums[a.id]?.total ?? 0);
               }
@@ -87,6 +92,7 @@ class _CustomersAdminState extends State<CustomersAdmin> {
                       ['balance', 'الأكتر مديونية'],
                       ['sales', 'الأكتر شراء'],
                       ['name', 'بالاسم'],
+                      ['visit', 'محتاج زيارة'],
                     ])
                       Padding(
                         padding: const EdgeInsets.all(4),
@@ -119,7 +125,7 @@ class _CustomersAdminState extends State<CustomersAdmin> {
                               title: Text(m['shopName'] ?? '',
                                   style: const TextStyle(fontWeight: FontWeight.bold)),
                               subtitle: Text(
-                                  '${m['ownerName'] ?? ''} • ${m['phone'] ?? ''}\nمشتريات ${money(s.total)} • ⭐ ${toI(m['points'])}'),
+                                  '${m['ownerName'] ?? ''} • ${m['phone'] ?? ''}\nمشتريات ${money(s.total)} • ⭐ ${toI(m['points'])}\n📍 ${lastVisitText(m)}'),
                               isThreeLine: true,
                               trailing: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,

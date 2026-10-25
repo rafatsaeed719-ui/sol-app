@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../auth/location_picker.dart';
+import '../auth/register_screen.dart';
 import '../core/app.dart';
 import '../core/data.dart';
 import '../customer/my_orders_screen.dart';
@@ -9,6 +10,7 @@ import '../shared/chat_screen.dart';
 import '../shared/invoice_view.dart';
 import 'customer_accounts.dart';
 import 'dashboard_screen.dart';
+import 'visits.dart';
 import 'invoice_form.dart';
 
 class CustomerDetail extends StatelessWidget {
@@ -28,11 +30,19 @@ class CustomerDetail extends StatelessWidget {
         }
         final name = (m['shopName'] ?? '').toString();
         return DefaultTabController(
-          length: 3,
+          length: 4,
           child: Scaffold(
             appBar: AppBar(
               title: Text(name),
               actions: [
+                IconButton(
+                  tooltip: 'تعديل البيانات',
+                  onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => RegisterScreen(existing: m, editUserId: customerId))),
+                  icon: const Icon(Icons.edit),
+                ),
                 IconButton(
                   tooltip: 'شات',
                   onPressed: () => Navigator.push(
@@ -46,7 +56,14 @@ class CustomerDetail extends StatelessWidget {
                 labelColor: Colors.white,
                 unselectedLabelColor: Colors.white70,
                 indicatorColor: kAccent,
-                tabs: [Tab(text: 'البيانات'), Tab(text: 'الفواتير'), Tab(text: 'الطلبات')],
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                tabs: [
+                  Tab(text: 'البيانات'),
+                  Tab(text: 'الزيارات'),
+                  Tab(text: 'الفواتير'),
+                  Tab(text: 'الطلبات'),
+                ],
               ),
             ),
             floatingActionButton: FloatingActionButton.extended(
@@ -60,6 +77,7 @@ class CustomerDetail extends StatelessWidget {
             ),
             body: TabBarView(children: [
               _Profile(customerId: customerId, m: m),
+              CustomerVisitsTab(customerId: customerId, customer: m),
               _Invoices(customerId: customerId),
               _Orders(customerId: customerId),
             ]),
@@ -173,6 +191,24 @@ class _Profile extends StatelessWidget {
               leading: const Icon(Icons.calendar_today),
               title: Text('مسجّل من ${fmtDate(m['createdAt'])}')),
         ]),
+      ),
+      Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: ListTile(
+          leading: Icon(Icons.location_history, color: lastVisitColor(m)),
+          title: Text(lastVisitText(m), style: TextStyle(color: lastVisitColor(m), fontWeight: FontWeight.bold)),
+          subtitle: Text([
+            if ((m['lastVisitResult'] ?? '').toString().isNotEmpty) m['lastVisitResult'],
+            if ((m['lastVisitNote'] ?? '').toString().isNotEmpty) '💬 ${m['lastVisitNote']}',
+            if (m['nextVisit'] != null) 'الزيارة الجاية: ${fmtDate(m['nextVisit'])}',
+          ].join('\n')),
+          trailing: IconButton.filled(
+            tooltip: 'سجّل زيارة',
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => VisitForm(customerId: customerId, customer: m))),
+            icon: const Icon(Icons.add_location_alt),
+          ),
+        ),
       ),
       CredentialsCard(customerId: customerId, m: m),
       Card(

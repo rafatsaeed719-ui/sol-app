@@ -11,9 +11,12 @@ import 'invoices_admin.dart';
 import 'offers_admin.dart';
 import 'orders_admin.dart';
 import 'products_admin.dart';
+import 'analytics_screen.dart';
 import 'expenses_screen.dart';
+import 'visits.dart';
 import 'reports_screen.dart';
 import 'store_profile.dart';
+import 'storefront_editor.dart';
 import 'stores_admin.dart';
 import 'warehouse_screen.dart';
 import 'settings_screen.dart';
@@ -194,6 +197,22 @@ class _MoreMenu extends StatelessWidget {
       ),
       item(Icons.receipt_long, 'الفواتير والتحصيل', 'كل الفواتير، المتأخرات، الدفعات',
           const InvoicesAdmin(standalone: true)),
+      StreamBuilder(
+        stream: scoped('users').snapshots(),
+        builder: (context, us) {
+          final now = DateTime.now();
+          final end = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+          final due = (us.data?.docs ?? []).where((d) {
+            final n = tsToDate(d.data()['nextVisit']);
+            return n != null && n.isBefore(end);
+          }).length;
+          return item(Icons.location_history, 'الزيارات',
+              'سجّل زيارة، آخر زيارة، مين محتاج يتزار', const VisitsScreen(),
+              badge: due > 0 ? Badge(label: Text('$due النهارده')) : null);
+        },
+      ),
+      item(Icons.insights, 'الرسومات البيانية', 'المبيعات والتحصيل والمصروفات بالرسم',
+          const AnalyticsScreen()),
       item(Icons.warehouse, 'المخزن', 'الأرصدة، الوارد والصادر، اتحرك فين ولمين',
           const WarehouseScreen()),
       item(Icons.account_balance_wallet, 'المصروفات', 'اتصرف في إيه وكام ولمين',
@@ -202,6 +221,8 @@ class _MoreMenu extends StatelessWidget {
           const OffersAdmin()),
       item(Icons.bar_chart, 'التقارير', 'حركة الأصناف، أكتر عميل، أكتر صنف',
           const ReportsScreen()),
+      item(Icons.web, 'واجهة المتجر', 'البانرات وحكاية البراند والسوشيال',
+          const StorefrontEditor()),
       item(Icons.storefront, 'بيانات المحل', 'الاسم واللوجو ورسالة الترحيب',
           const StoreProfileScreen()),
       item(Icons.settings, 'الإعدادات', 'أيام التحصيل ونظام النقاط', const SettingsScreen()),

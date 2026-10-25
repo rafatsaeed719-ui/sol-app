@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/app.dart';
 import '../core/data.dart';
 import '../shared/invoice_view.dart';
+import 'analytics_screen.dart';
 import 'customer_detail.dart';
 import 'expenses_screen.dart';
 import 'warehouse_screen.dart';
@@ -69,6 +70,7 @@ class DashboardScreen extends StatelessWidget {
               },
             ),
           ),
+          const WeekSalesCard(),
           // المصروفات والتحصيل الشهر ده
           StreamBuilder(
             stream: scoped('expenses').snapshots(),
