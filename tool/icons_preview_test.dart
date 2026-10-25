@@ -62,7 +62,9 @@ void main() {
         ),
       ),
     ));
-    await tester.pump(const Duration(milliseconds: 1200));
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     await expectLater(find.byType(Scaffold), matchesGoldenFile('icons_preview.png'));
   });
 }
