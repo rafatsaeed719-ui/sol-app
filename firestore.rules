@@ -120,6 +120,10 @@ service cloud.firestore {
       allow read, update, delete: if isSuper() || canManage(resource.data.storeId);
       allow create: if isSuper() || canManage(request.resource.data.storeId);
     }
+    match /contacts/{id} {
+      allow read, update, delete: if isSuper() || canManage(resource.data.storeId);
+      allow create: if isSuper() || canManage(request.resource.data.storeId);
+    }
     match /visits/{id} {
       allow read, update, delete: if isSuper() || canManage(resource.data.storeId);
       allow create: if isSuper() || canManage(request.resource.data.storeId);

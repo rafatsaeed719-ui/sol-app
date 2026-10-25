@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app.dart';
+import '../core/fx.dart';
 import 'register_screen.dart';
 import 'store_signup.dart';
 
@@ -80,9 +81,24 @@ class _LoginScreenState extends State<LoginScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Image.asset('assets/logo.png', width: 180, height: 180),
+              FadeSlideIn(
+                child: Floating(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                            color: kAccent.withValues(alpha: 0.35),
+                            blurRadius: 30,
+                            offset: const Offset(0, 12)),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Image.asset('assets/logo.png', width: 180, height: 180),
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 14),
               const Text('اطلب بضاعتك بسهولة',

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/app.dart';
+import '../core/fx.dart';
 import '../core/data.dart';
 import '../shared/notifications.dart';
 import 'chats_admin.dart';
+import 'contacts_screen.dart';
 import 'customers_admin.dart';
 import 'dashboard_screen.dart';
 import 'invoices_admin.dart';
@@ -87,7 +89,7 @@ class _AdminHomeState extends State<AdminHome> {
     final pages = [
       DashboardScreen(onGo: (i) => setState(() => tab = i)),
       const OrdersAdmin(),
-      const CustomersAdmin(),
+      const _CustomersHub(),
       const ProductsAdmin(),
       const _MoreMenu(),
     ];
@@ -113,24 +115,16 @@ class _AdminHomeState extends State<AdminHome> {
                   selectedIndex: tab,
                   onDestinationSelected: (i) => setState(() => tab = i),
                   destinations: [
-                    const NavigationDestination(
-                        icon: Icon(Icons.dashboard_outlined), label: 'الرئيسية'),
-                    NavigationDestination(
-                        icon: Badge(
-                            isLabelVisible: n > 0,
-                            label: Text('$n'),
-                            child: const Icon(Icons.shopping_cart_outlined)),
-                        label: 'الطلبات'),
-                    const NavigationDestination(
-                        icon: Icon(Icons.storefront_outlined), label: 'العملاء'),
-                    const NavigationDestination(
-                        icon: Icon(Icons.inventory_2_outlined), label: 'الأصناف'),
-                    NavigationDestination(
-                        icon: Badge(
+                    nav3D(Icons.dashboard, 'الرئيسية'),
+                    nav3D(Icons.shopping_cart, 'الطلبات',
+                        wrap: (x) => Badge(isLabelVisible: n > 0, label: Text('$n'), child: x)),
+                    nav3D(Icons.storefront, 'العملاء'),
+                    nav3D(Icons.inventory_2, 'الأصناف'),
+                    nav3D(Icons.apps, 'المزيد',
+                        wrap: (x) => Badge(
                             isLabelVisible: unreadChats > 0,
                             label: Text('$unreadChats'),
-                            child: const Icon(Icons.menu)),
-                        label: 'المزيد'),
+                            child: x)),
                   ],
                 );
               },
@@ -147,17 +141,25 @@ class _MoreMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget item(IconData i, String t, String sub, Widget page, {Widget? badge}) => Card(
+    var order = 0;
+    const tones = [tGold, tBlue, tGreen, tPurple, tOrange, tTeal, tRed, tBlack];
+    Widget item(IconData i, String t, String sub, Widget page, {Widget? badge}) {
+      final k = order++;
+      return FadeSlideIn(
+        delayMs: 40 * k,
+        child: Card(
           child: ListTile(
-            leading: CircleAvatar(
-                backgroundColor: kPrimary.withValues(alpha: 0.1),
-                child: Icon(i, color: kPrimary)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            leading: Icon3D(i, size: 46, tone: tones[k % tones.length], delayMs: 60 * k),
             title: Text(t, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(sub),
             trailing: badge ?? const Icon(Icons.chevron_left),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page)),
           ),
-        );
+        ),
+      );
+    }
+
     return ListView(padding: const EdgeInsets.symmetric(vertical: 8), children: [
       if (isSuper)
         Card(
@@ -239,5 +241,28 @@ class _MoreMenu extends StatelessWidget {
         ),
       ),
     ]);
+  }
+}
+
+
+/// تبويب العملاء: حسابات التطبيق + دفتر العملاء (أرقام وعناوين)
+class _CustomersHub extends StatelessWidget {
+  const _CustomersHub();
+  @override
+  Widget build(BuildContext context) {
+    return const DefaultTabController(
+      length: 2,
+      child: Column(children: [
+        TabBar(
+          labelColor: kPrimary,
+          indicatorColor: kAccent,
+          tabs: [
+            Tab(icon: Icon(Icons.phone_android), text: 'حسابات التطبيق'),
+            Tab(icon: Icon(Icons.contacts), text: 'دفتر العملاء'),
+          ],
+        ),
+        Expanded(child: TabBarView(children: [CustomersAdmin(), ContactsTab()])),
+      ]),
+    );
   }
 }

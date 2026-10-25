@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app.dart';
+import '../core/fx.dart';
 import '../core/data.dart';
 import '../shared/chat_screen.dart';
 import '../shared/notifications.dart';
@@ -152,12 +153,12 @@ class _CustomerHomeState extends State<CustomerHome> {
             bottomNavigationBar: NavigationBar(
               selectedIndex: tab,
               onDestinationSelected: (i) => setState(() => tab = i),
-              destinations: const [
-                NavigationDestination(icon: Icon(Icons.home_outlined), label: 'الرئيسية'),
-                NavigationDestination(icon: Icon(Icons.storefront_outlined), label: 'المنتجات'),
-                NavigationDestination(icon: Icon(Icons.local_offer_outlined), label: 'العروض'),
-                NavigationDestination(icon: Icon(Icons.receipt_outlined), label: 'طلباتي'),
-                NavigationDestination(icon: Icon(Icons.person_outline), label: 'حسابي'),
+              destinations: [
+                nav3D(Icons.home, 'الرئيسية'),
+                nav3D(Icons.storefront, 'المنتجات'),
+                nav3D(Icons.local_offer, 'العروض'),
+                nav3D(Icons.receipt_long, 'طلباتي'),
+                nav3D(Icons.person, 'حسابي'),
               ],
             ),
           );

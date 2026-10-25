@@ -6,6 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'fx.dart';
+
 /// إيميل صاحب المنصة (المدير العام) — بيدير كل المحلات، وهو كمان صاحب محل SOL.
 const String kAdminEmail = 'rafatsaeed719@gmail.com';
 const String kBrand = 'SOL';
@@ -292,7 +294,7 @@ class StatTile extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Icon(icon, color: color, size: 20),
+              Icon3D(icon, size: 26, tone: toneOf(color)),
               const SizedBox(width: 6),
               Expanded(
                   child: Text(label,

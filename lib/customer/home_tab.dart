@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app.dart';
+import '../core/fx.dart';
 import '../core/data.dart';
 import 'catalog_screen.dart';
 
@@ -251,7 +252,8 @@ class _Values extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(10),
                 child: Row(children: [
-                  Icon(icons[i % icons.length], color: kAccent),
+                  Icon3D(icons[i % icons.length],
+                      size: 40, tone: tGold, float: true, delayMs: 120 * i),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
