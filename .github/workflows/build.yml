@@ -54,6 +54,11 @@ jobs:
       - name: Sample invoice PDF
         run: flutter test tool/pdf_preview_test.dart > pdf-test.log 2>&1 || (tail -60 pdf-test.log; true)
 
+      - name: Icons preview
+        run: |
+          flutter test tool/icons_preview_test.dart --update-goldens > icons-test.log 2>&1 || (tail -40 icons-test.log; true)
+          cp tool/icons_preview.png icons_preview.png 2>/dev/null || true
+
       - name: Analyze
         run: |
           set +e
@@ -90,6 +95,8 @@ jobs:
             SOL-arm64.apk
             SOL-invoice-sample.pdf
             pdf-test.log
+            icons_preview.png
+            icons-test.log
           make_latest: true
 
       - name: Publish error log
