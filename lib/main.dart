@@ -9,6 +9,7 @@ import 'auth/register_screen.dart';
 import 'core/app.dart';
 import 'core/migration.dart';
 import 'core/platform.dart';
+import 'core/push.dart';
 import 'customer/customer_home.dart';
 import 'firebase_options.dart';
 
@@ -81,6 +82,7 @@ class AuthGate extends StatelessWidget {
         }
         final user = snap.data;
         if (user == null) {
+          clearPush();
           Session.reset();
           return const LoginScreen();
         }

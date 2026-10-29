@@ -391,7 +391,9 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
       ];
       app = [
         for (final d in r[1].docs)
-          if (d.data()['role'] != 'owner' && (d.data()['phone'] ?? '').toString().isNotEmpty)
+          if (d.data()['role'] != 'owner' &&
+              d.data()['deleted'] != true &&
+              (d.data()['phone'] ?? '').toString().isNotEmpty)
             Recipient((d.data()['ownerName'] ?? d.data()['shopName'] ?? '').toString(),
                 (d.data()['phone'] ?? '').toString())
       ];

@@ -396,7 +396,7 @@ class _DueTab extends StatelessWidget {
         final today = DateTime(end.year, end.month, end.day).add(const Duration(days: 1));
         final _Docs list = s.data!.docs.where((d) {
           final n = tsToDate(d.data()['nextVisit']);
-          return d.data()['role'] != 'owner' && n != null && n.isBefore(today);
+          return d.data()['role'] != 'owner' && d.data()['deleted'] != true && n != null && n.isBefore(today);
         }).toList()
           ..sort((a, b) => tsToDate(a.data()['nextVisit'])!.compareTo(tsToDate(b.data()['nextVisit'])!));
         if (list.isEmpty) {
@@ -429,7 +429,7 @@ class _NeedVisitTabState extends State<_NeedVisitTab> {
         if (s.hasError) return EmptyView('${s.error}');
         if (!s.hasData) return const Loading();
         final _Docs list = s.data!.docs.where((d) {
-          if (d.data()['role'] == 'owner') return false;
+          if (d.data()['role'] == 'owner' || d.data()['deleted'] == true) return false;
           final n = daysSinceVisit(d.data());
           return n == null || n >= days;
         }).toList()

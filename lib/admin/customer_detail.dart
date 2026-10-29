@@ -8,6 +8,7 @@ import '../core/data.dart';
 import '../customer/my_orders_screen.dart';
 import '../shared/chat_screen.dart';
 import '../shared/invoice_view.dart';
+import '../shared/messages.dart';
 import 'customer_accounts.dart';
 import 'dashboard_screen.dart';
 import 'visits.dart';
@@ -50,6 +51,37 @@ class CustomerDetail extends StatelessWidget {
                       MaterialPageRoute(
                           builder: (_) => ChatScreen(customerId: customerId, title: name))),
                   icon: const Icon(Icons.chat),
+                ),
+                PopupMenuButton<String>(
+                  onSelected: (v) async {
+                    if (v == 'msg') {
+                      await sendPersonalMessage(context, customerId, m);
+                    } else if (v == 'delete') {
+                      final ok = await confirm(context, 'حذف ${m['shopName'] ?? 'العميل'}',
+                          'هيتمسح حساب العميل ومش هيقدر يدخل التطبيق تاني. فواتيره القديمة هتفضل في السجل.\n\nمتأكد؟');
+                      if (!ok || !context.mounted) return;
+                      try {
+                        await deleteCustomer(customerId, m);
+                        if (context.mounted) {
+                          toast(context, 'اتحذف العميل');
+                          Navigator.pop(context);
+                        }
+                      } catch (e) {
+                        if (context.mounted) toast(context, '$e', error: true);
+                      }
+                    }
+                  },
+                  itemBuilder: (c) => const [
+                    PopupMenuItem(
+                        value: 'msg',
+                        child: ListTile(
+                            leading: Icon(Icons.mark_chat_unread), title: Text('رسالة خاصة للعميل'))),
+                    PopupMenuItem(
+                        value: 'delete',
+                        child: ListTile(
+                            leading: Icon(Icons.person_remove, color: kDanger),
+                            title: Text('حذف العميل', style: TextStyle(color: kDanger)))),
+                  ],
                 ),
               ],
               bottom: const TabBar(
@@ -159,7 +191,7 @@ class _Profile extends StatelessWidget {
             label: const Text('اتصال')),
         const SizedBox(width: 8),
         FilledButton.tonalIcon(
-            onPressed: () => whatsapp(phone, 'أهلاً ${m['ownerName'] ?? ''}، معاك SOL'),
+            onPressed: () => whatsapp(phone, 'أهلاً ${m['ownerName'] ?? ''}، معاك $storeName'),
             icon: const Icon(Icons.message),
             label: const Text('واتساب')),
       ]),
@@ -211,6 +243,20 @@ class _Profile extends StatelessWidget {
         ),
       ),
       CredentialsCard(customerId: customerId, m: m),
+      Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: ListTile(
+          leading: const Icon(Icons.mark_chat_unread, color: kAccent),
+          title: const Text('رسالة خاصة / ترحيب', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text(m['personalMessage'] is Map
+              ? '${(m['personalMessage']['text'] ?? '')}\n${tsToDate(m['personalMessageSeenAt']) != null && !tsToDate(m['personalMessageSeenAt'])!.isBefore(tsToDate(m['personalMessage']['at']) ?? DateTime(2000)) ? '✔ شافها' : '⏳ لسه ماشافهاش'}'
+              : 'ابعتله رسالة تظهرله أول ما يفتح التطبيق'),
+          trailing: IconButton.filledTonal(
+            onPressed: () => sendPersonalMessage(context, customerId, m),
+            icon: const Icon(Icons.edit),
+          ),
+        ),
+      ),
       Card(
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: SwitchListTile(

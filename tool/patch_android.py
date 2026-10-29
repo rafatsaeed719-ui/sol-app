@@ -9,6 +9,7 @@ perms = [
     'android.permission.INTERNET',
     'android.permission.ACCESS_FINE_LOCATION',
     'android.permission.ACCESS_COARSE_LOCATION',
+    'android.permission.POST_NOTIFICATIONS',
 ]
 add = ''.join(f'    <uses-permission android:name="{p}"/>\n' for p in perms if p not in m)
 m = re.sub(r'(<manifest[^>]*>\n)', r'\1' + add, m, count=1)

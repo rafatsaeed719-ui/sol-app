@@ -3,9 +3,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/app.dart';
 import '../core/fx.dart';
+import '../core/push.dart';
 import '../core/data.dart';
 import '../shared/notifications.dart';
 import 'chats_admin.dart';
+import '../shared/messages.dart';
 import 'contacts_screen.dart';
 import 'customers_admin.dart';
 import 'dashboard_screen.dart';
@@ -35,6 +37,7 @@ class _AdminHomeState extends State<AdminHome> {
   @override
   void initState() {
     super.initState();
+    setupPush(['admin_$sid', if (isSuper) 'super']);
     WidgetsBinding.instance.addPostFrameCallback((_) => _overdueAlert());
   }
 
@@ -219,6 +222,8 @@ class _MoreMenu extends StatelessWidget {
           const WarehouseScreen()),
       item(Icons.account_balance_wallet, 'المصروفات', 'اتصرف في إيه وكام ولمين',
           const ExpensesScreen()),
+      item(Icons.campaign, 'الإعلانات والرسائل', 'رسالة أو إعلان يوصل لكل العملاء بإشعار',
+          const AnnouncementsScreen()),
       item(Icons.local_offer, 'العروض', 'اعمل عرض ويوصل إشعار لكل العملاء',
           const OffersAdmin()),
       item(Icons.bar_chart, 'التقارير', 'حركة الأصناف، أكتر عميل، أكتر صنف',

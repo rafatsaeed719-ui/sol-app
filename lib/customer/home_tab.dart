@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/app.dart';
 import '../core/fx.dart';
 import '../core/data.dart';
+import '../shared/messages.dart';
 import 'catalog_screen.dart';
 
 /// بيانات واجهة المتجر (النصوص والسوشيال) — في stores/{sid}/meta/storefront
@@ -53,6 +54,7 @@ class HomeTab extends StatelessWidget {
         final social = Map<String, dynamic>.from(f['social'] ?? {});
         return ListView(padding: const EdgeInsets.only(bottom: 90), children: [
           _Hero(f: f),
+          const AnnouncementsStrip(),
           if (aboutText.isNotEmpty)
             _AboutCard(title: aboutTitle, text: aboutText, image: f['aboutImage']),
           if (values.isNotEmpty) _Values(values: values),

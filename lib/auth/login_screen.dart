@@ -43,7 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> login() async {
     if (email.text.trim().isEmpty || pass.text.isEmpty) {
-      toast(context, 'اكتب اسم المستخدم (أو الإيميل) والباسورد', error: true);
+      toast(context, 'اكتب رقم الموبايل (أو اسم المستخدم) وكلمة السر', error: true);
       return;
     }
     setState(() => busy = true);
@@ -109,7 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.emailAddress,
                 textDirection: TextDirection.ltr,
                 decoration: const InputDecoration(
-                    labelText: 'اسم المستخدم أو الإيميل', prefixIcon: Icon(Icons.person_outline)),
+                    labelText: 'رقم الموبايل أو اسم المستخدم', prefixIcon: Icon(Icons.person_outline)),
               ),
               const SizedBox(height: 12),
               TextField(

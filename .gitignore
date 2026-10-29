@@ -9,3 +9,4 @@ pubspec.lock
 .idea/
 test/
 web/
+tool/push/node_modules/

@@ -88,7 +88,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         Session.store = st.data()!;
       }
       if (needAccount) {
-        if (!email.text.contains('@') && !validUsername(email.text)) {
+        if (!email.text.contains('@') && !validUsername(normalizeLogin(email.text))) {
           throw 'اسم المستخدم بالإنجليزي أو أرقام من غير مسافات (3 حروف على الأقل)';
         }
         await auth.createUserWithEmailAndPassword(
@@ -105,7 +105,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           if (location != null) 'lng': location!.longitude,
           if (!editMode) 'email': auth.currentUser?.email ?? '',
           if (needAccount && !email.text.contains('@'))
-            'username': email.text.trim().toLowerCase(),
+            'username': normalizeLogin(email.text).toLowerCase(),
           if (needAccount) 'password': pass.text,
         };
         final ref = db.collection('users').doc(widget.editUserId ?? uid);
@@ -209,7 +209,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ],
         if (needAccount) ...[
-          _f(email, 'الإيميل أو اسم مستخدم *', Icons.email_outlined,
+          _f(email, 'رقم الموبايل أو الإيميل * (هتدخل بيه)', Icons.phone_android,
               type: TextInputType.emailAddress, ltr: true),
           _f(pass, 'الباسورد * (6 على الأقل)', Icons.lock_outline,
               obscure: true, ltr: true),

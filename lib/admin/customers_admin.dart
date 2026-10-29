@@ -50,7 +50,7 @@ class _CustomersAdminState extends State<CustomersAdmin> {
               for (final e in byCustomer.entries) e.key: summarize(e.value),
             };
             var list = us.data!.docs.where((d) {
-              if (d.data()['role'] == 'owner') return false;
+              if (d.data()['role'] == 'owner' || d.data()['deleted'] == true) return false;
               if (q.isEmpty) return true;
               final m = d.data();
               final hay = '${m['shopName']} ${m['ownerName']} ${m['phone']} ${m['address']}'

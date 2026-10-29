@@ -24,7 +24,18 @@ String usernameToEmail(String username) =>
 /// اللي اتكتب في خانة الدخول: لو فيه @ يبقى إيميل، غير كده يبقى اسم مستخدم
 String loginToEmail(String input) {
   final t = input.trim();
-  return t.contains('@') ? t : usernameToEmail(t);
+  if (t.contains('@')) return t;
+  return usernameToEmail(normalizeLogin(t));
+}
+
+/// رقم الموبايل بأي شكل (+20 / مسافات) → 01xxxxxxxxx
+String normalizeLogin(String input) {
+  final t = input.trim();
+  final d = t.replaceAll(RegExp(r'[\s\-+()]'), '');
+  if (!RegExp(r'^\d+$').hasMatch(d)) return t;
+  if (d.startsWith('0020')) return '0${d.substring(4)}';
+  if (d.startsWith('20') && d.length == 12) return '0${d.substring(2)}';
+  return d;
 }
 
 bool validUsername(String u) => RegExp(r'^[a-zA-Z0-9._-]{3,30}$').hasMatch(u.trim());

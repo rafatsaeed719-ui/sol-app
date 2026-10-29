@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app.dart';
 import '../core/fx.dart';
+import '../core/push.dart';
 import '../core/data.dart';
 import '../shared/chat_screen.dart';
 import '../shared/notifications.dart';
@@ -9,6 +10,7 @@ import 'account_screen.dart';
 import 'cart_screen.dart';
 import 'catalog_screen.dart';
 import 'home_tab.dart';
+import '../shared/messages.dart';
 import 'my_orders_screen.dart';
 import 'offers_screen.dart';
 
@@ -31,13 +33,19 @@ class _CustomerHomeState extends State<CustomerHome> {
   int tab = 0;
   bool welcomeChecked = false;
 
+  @override
+  void initState() {
+    super.initState();
+    setupPush(['all_$sid', pushTopic(uid)]);
+  }
+
   /// رسالة الترحيب — بتظهر مرة واحدة بس أول ما المحل يسجّل
   void _maybeWelcome(Map<String, dynamic> me) {
     if (welcomeChecked || me.isEmpty) return;
     welcomeChecked = true;
-    if (me['welcomeShown'] == true) return;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      if (me['welcomeShown'] != true) {
       await showDialog(
         context: context,
         builder: (c) => Dialog(
@@ -84,6 +92,9 @@ class _CustomerHomeState extends State<CustomerHome> {
       try {
         await db.collection('users').doc(uid).update({'welcomeShown': true});
       } catch (_) {}
+      }
+      // الرسالة الخاصة وآخر إعلان
+      if (mounted) await showPendingMessages(context, me);
     });
   }
 

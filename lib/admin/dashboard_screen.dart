@@ -41,7 +41,7 @@ class DashboardScreen extends StatelessWidget {
                   stream: scoped('users').snapshots(),
                   builder: (context, u) {
                     final customers = (u.data?.docs ?? [])
-                        .where((d) => d.data()['role'] != 'owner')
+                        .where((d) => d.data()['role'] != 'owner' && d.data()['deleted'] != true)
                         .length;
                     return GridView.count(
                       crossAxisCount: 2,

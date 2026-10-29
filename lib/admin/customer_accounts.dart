@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 import '../auth/location_picker.dart';
 import '../auth/login_screen.dart';
 import '../core/app.dart';
+import '../core/data.dart';
 import '../firebase_options.dart';
 import 'dashboard_screen.dart';
 
@@ -151,6 +152,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
   final address = TextEditingController();
   final username = TextEditingController();
   final password = TextEditingController(text: randomPassword());
+  final welcome = TextEditingController();
   String? photo;
   LatLng? location;
   bool busy = false;
@@ -158,6 +160,12 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
   Future<void> save() async {
     if (shop.text.trim().isEmpty) {
       toast(context, 'اكتب اسم المحل', error: true);
+      return;
+    }
+    final digits = normalizeLogin(phone.text.replaceAll(RegExp(r'[^0-9+]'), ''));
+    if (username.text.trim().isEmpty) username.text = digits;
+    if (username.text.trim().isEmpty) {
+      toast(context, 'اكتب رقم الموبايل — العميل هيدخل بيه', error: true);
       return;
     }
     if (!validUsername(username.text)) {
@@ -182,6 +190,12 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
           'photo': photo ?? '',
           if (location != null) 'lat': location!.latitude,
           if (location != null) 'lng': location!.longitude,
+          if (welcome.text.trim().isNotEmpty)
+            'personalMessage': {
+              'title': 'أهلاً بيك في $storeName ✨',
+              'text': welcome.text.trim(),
+              'at': Timestamp.now(),
+            },
         },
       );
       if (!mounted) return;
@@ -196,7 +210,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
         toast(
             context,
             e.code == 'email-already-in-use'
-                ? 'اسم المستخدم ده موجود قبل كده — اختار اسم تاني'
+                ? 'الرقم أو اسم المستخدم ده متسجل قبل كده'
                 : authError(e),
             error: true);
       }
@@ -233,7 +247,8 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
         const SizedBox(height: 16),
         _f(shop, 'اسم المحل *', Icons.storefront),
         _f(owner, 'اسم صاحب المحل', Icons.person_outline),
-        _f(phone, 'رقم الموبايل', Icons.phone, type: TextInputType.phone, ltr: true),
+        _f(phone, 'رقم الموبايل * (العميل هيدخل بيه)', Icons.phone,
+            type: TextInputType.phone, ltr: true),
         _f(address, 'العنوان', Icons.home_outlined),
         Card(
           margin: const EdgeInsets.only(bottom: 12),
@@ -254,7 +269,8 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
         const Text('🔐 بيانات الدخول',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 10),
-        _f(username, 'اسم المستخدم * (إنجليزي أو أرقام)', Icons.badge_outlined, ltr: true),
+        _f(username, 'اسم المستخدم (اختياري — لو فاضي هيدخل برقم الموبايل)', Icons.badge_outlined,
+            ltr: true),
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: TextField(
@@ -271,7 +287,17 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
             ),
           ),
         ),
+        const Divider(height: 24),
+        const Text('💌 رسالة ترحيب خاصة (اختياري)',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 8),
+        TextField(
+          controller: welcome,
+          maxLines: 3,
+          decoration: const InputDecoration(
+              hintText: 'هتظهرله أول ما يفتح التطبيق — مثلاً: نورتنا يا حاج محمد، عندك خصم 5% على أول طلب'),
+        ),
+        const SizedBox(height: 16),
         SizedBox(
           height: 48,
           child: FilledButton.icon(
@@ -302,21 +328,45 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
 
 // ======================== كارت بيانات الدخول في صفحة العميل ========================
 
+/// حذف عميل: لو كلمة السر متسجلة بنمسح حسابه خالص، غير كده بنوقفه ونخفيه
+Future<bool> deleteCustomer(String id, Map<String, dynamic> m) async {
+  final email = loginEmailOf(m);
+  final pass = (m['password'] ?? '').toString();
+  if (email.isNotEmpty && pass.isNotEmpty) {
+    try {
+      final helper = await _helperAuth();
+      final cred = await helper.signInWithEmailAndPassword(email: email, password: pass);
+      await cred.user!.delete();
+      await helper.signOut();
+      await db.collection('users').doc(id).delete();
+      return true;
+    } catch (_) {}
+  }
+  await db.collection('users').doc(id).update({'deleted': true, 'disabled': true});
+  return false;
+}
+
 class CredentialsCard extends StatelessWidget {
   final String customerId;
   final Map<String, dynamic> m;
   const CredentialsCard({super.key, required this.customerId, required this.m});
+
+  String get loginId {
+    final u = (m['username'] ?? '').toString();
+    if (u.isNotEmpty) return u;
+    return (m['email'] ?? '').toString();
+  }
 
   Future<void> _change(BuildContext context) async {
     final c = TextEditingController(text: randomPassword());
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
-        title: const Text('تغيير كلمة السر'),
+        title: const Text('كلمة سر جديدة'),
         content: TextField(
           controller: c,
           textDirection: TextDirection.ltr,
-          decoration: const InputDecoration(labelText: 'كلمة السر الجديدة'),
+          decoration: const InputDecoration(labelText: 'كلمة السر الجديدة (6 على الأقل)'),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
@@ -330,11 +380,11 @@ class CredentialsCard extends StatelessWidget {
       return;
     }
     try {
-      await changeCustomerPassword(customerId, m['username'], m['password'] ?? '', c.text);
+      await changeUserPassword(customerId, loginEmailOf(m), m['password'] ?? '', c.text);
       if (context.mounted) {
         await showCredentials(context,
             shop: m['shopName'] ?? '',
-            username: m['username'],
+            username: loginId,
             password: c.text,
             phone: m['phone'] ?? '');
       }
@@ -345,34 +395,48 @@ class CredentialsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = (m['username'] ?? '').toString();
-    if (user.isEmpty) return const SizedBox();
+    final user = loginId;
     final pass = (m['password'] ?? '').toString();
+    final realEmail = user.contains('@') && !user.endsWith('@$kUserDomain');
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           const Text('🔐 بيانات الدخول', style: TextStyle(fontWeight: FontWeight.bold)),
-          _credRow('اسم المستخدم', user),
-          _credRow('كلمة السر', pass.isEmpty ? '—' : pass),
+          _credRow('بيدخل بـ', user.isEmpty ? '—' : user),
+          _credRow('كلمة السر', pass.isEmpty ? 'مش متسجلة' : pass),
           Wrap(spacing: 8, children: [
-            TextButton.icon(
-              onPressed: () => showCredentials(context,
-                  shop: m['shopName'] ?? '',
-                  username: user,
-                  password: pass,
-                  phone: m['phone'] ?? ''),
-              icon: const Icon(Icons.share),
-              label: const Text('ابعتها للعميل'),
-            ),
+            if (pass.isNotEmpty)
+              TextButton.icon(
+                onPressed: () => showCredentials(context,
+                    shop: m['shopName'] ?? '',
+                    username: user,
+                    password: pass,
+                    phone: m['phone'] ?? ''),
+                icon: const Icon(Icons.share),
+                label: const Text('ابعتها للعميل'),
+              ),
             if (pass.isNotEmpty)
               TextButton.icon(
                 onPressed: () => _change(context),
                 icon: const Icon(Icons.lock_reset),
                 label: const Text('تغيير كلمة السر'),
               ),
+            if (pass.isEmpty && realEmail)
+              TextButton.icon(
+                onPressed: () async {
+                  await auth.sendPasswordResetEmail(email: user);
+                  if (context.mounted) toast(context, 'اتبعتله رسالة على الإيميل يغيّر منها كلمة السر');
+                },
+                icon: const Icon(Icons.mark_email_read),
+                label: const Text('ابعتله رسالة تغيير كلمة السر'),
+              ),
           ]),
+          if (pass.isEmpty && !realEmail)
+            const Text(
+                'العميل ده سجّل بنفسه قبل ما نحفظ كلمات السر، فمينفعش تتغير من هنا. لو نسيها: احذفه واعمله حساب جديد برقم موبايله.',
+                style: TextStyle(fontSize: 12, color: Colors.black54)),
         ]),
       ),
     );
