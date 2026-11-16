@@ -1,24 +1,9 @@
-<div class="wrap">
 
-<div>
-
-<div class="logo">
-
-SOL<span class="small">PERFUME</span>
-
-</div>
+SOL PERFUME
 
 # سياسة الخصوصية — Privacy Policy
 
-<div class="date">
-
 آخر تحديث / Last updated: 16 November 2026
-
-</div>
-
-</div>
-
-<div class="section" dir="rtl">
 
 توضح هذه السياسة كيف يجمع تطبيق **سول** (SOL) — تطبيق حسابات وطلبات
 عملاء SOL PERFUME، رقم الحزمة `com.sol.accounts` — البيانات ويستخدمها
@@ -73,16 +58,12 @@ SOL<span class="small">PERFUME</span>
 
 ## 6. حذف الحساب والبيانات
 
-<div class="box">
-
 يمكنك طلب حذف حسابك وبياناتك في أي وقت عن طريق:
 
 - واتساب: **01207760898** (من زر «تواصل مع الإدارة» داخل التطبيق)
 - البريد الإلكتروني: **rafatsaeed719@gmail.com**
 
 اكتب رقم الموبايل المسجل به الحساب، وسيتم الحذف خلال مدة أقصاها 30 يوماً.
-
-</div>
 
 ## 7. حماية البيانات
 
@@ -106,11 +87,7 @@ SOL PERFUME — مصر
 واتساب: 01207760898  
 البريد: rafatsaeed719@gmail.com
 
-</div>
-
 ------------------------------------------------------------------------
-
-<div class="section" dir="ltr" lang="en">
 
 This policy explains how the **SOL** app (package `com.sol.accounts`) —
 the accounts and ordering app for SOL PERFUME customers — collects, uses
@@ -169,14 +146,10 @@ keep for accounting and legal purposes.
 
 ## 6. Account and data deletion
 
-<div class="box">
-
 You can request deletion of your account and data at any time via
 WhatsApp **+20 120 776 0898** (the “Contact management” button in the
 app) or email **rafatsaeed719@gmail.com**. Include the mobile number of
 the account. Deletion is completed within 30 days.
-
-</div>
 
 ## 7. Security
 
@@ -200,6 +173,3 @@ SOL PERFUME — Egypt
 WhatsApp: +20 120 776 0898  
 Email: rafatsaeed719@gmail.com
 
-</div>
-
-</div>
